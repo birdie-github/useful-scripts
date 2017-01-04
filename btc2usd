@@ -1,8 +1,8 @@
 #! /bin/bash
 
 if jq --version &>/dev/null; then
-    price=`curl -s http://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/"//g'`
-    printf "$%.2f" "$price"
+    price=`curl -s http://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'`
+    printf "$%.f" "$price"
 else
     echo "Install jq"
 fi
