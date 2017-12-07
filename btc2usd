@@ -1,0 +1,8 @@
+#! /bin/bash
+
+if jq --version &>/dev/null; then
+    price=`curl --silent --max-time 3 http://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'`
+    printf " $%'.f " " $price" 2>&1 # Yeah, show everything even if we have errors (so that the user knew that this script has broken
+else
+    echo "Install jq"
+fi
