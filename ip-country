@@ -1,0 +1,10 @@
+#! /bin/bash
+
+if jq --version &>/dev/null; then
+    data=`curl --silent --max-time 3 https://ipapi.co/json/ 2>/dev/null`
+    IP=`echo "$data" | jq .ip`
+    country=`echo "$data" | jq .country`
+    echo -n "$country:$IP" | sed 's/"//g'
+else
+    echo "Install jq"
+fi
