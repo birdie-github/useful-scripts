@@ -1,0 +1,5 @@
+#! /bin/bash
+
+# Shows the maximum frequency of all CPU cores in the system
+
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq | awk '{if (max<$0) max=$0}END{printf "%.2fGHz",max/1000000}'
