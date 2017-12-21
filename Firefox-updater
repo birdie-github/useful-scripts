@@ -5,15 +5,13 @@
 #              allows you to update Firefox from command line/CLI/terminal
 # Author: Artem S. Tashkinov
 # Created at: Wed Dec 20 13:50:32 +05 2017
+#             Thu Dec 21 12:43:35 +05 2017 - remove hard coded values & fixes
 # Computer: localhost.localdomain
 # System: Linux 4.14.3-300.fc27.x86_64 on x86_64
 #
 # Copyright (c) 2017 Artem S. Tashkinov  All rights reserved.
 #
 #----------------------------------------------------------------------
-
-USERSAFE="games"
-SRCDIR=/opt/firefox-work
 
 diewithmsg()
 {
@@ -23,16 +21,23 @@ diewithmsg()
 
 sanitychecker()
 {
-    test -z "$1" && diewithmsg "Empty version string. This script has failed."
+    test -z "$1" && diewithmsg "Empty version string. Perhaps this script needs to be updated."
     result=`echo "$1" | sed 's/\.//;s/b//;s/[0-9]//g'`
     test -n "$result" && diewithmsg "The version string [$1] is wrong."
 }
+
+test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory"
+grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
+test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation directory"
+
+USERSAFE="$1"
+SRCDIR="$2"
 
 id=`id -u` || diewithmsg "id failed!"
 
 if [ "$id" == "0" ]; then
     echo -n "Dropping root privileges ... "
-    sudo -u "$USERSAFE" "$0" || diewithmsg "root shall not pass!"
+    sudo -u "$USERSAFE" "$0" "$1" "$2"
     exit 0
 fi
 
