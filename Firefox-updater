@@ -2,16 +2,19 @@
 
 #----------------------------------------------------------------------
 # Description: the official Linux x86-64 Firefox distribution updater
-#              allows you to update Firefox from command line/CLI/terminal
+#              Allows you to update Firefox from command line/CLI/terminal
+#
 # Author: Artem S. Tashkinov
-# Created at: Wed Dec 20 13:50:32 +05 2017
-#             Thu Dec 21 12:43:35 +05 2017 - remove hard coded values & fixes
+# Created at: Wed Dec 20 13:50 +05 2017
+#             Thu Dec 21 13:08 +05 2017 - remove hard coded values & update channel
 # Computer: localhost.localdomain
 # System: Linux 4.14.3-300.fc27.x86_64 on x86_64
 #
 # Copyright (c) 2017 Artem S. Tashkinov  All rights reserved.
-#
 #----------------------------------------------------------------------
+
+# See the list of available languages here: https://ftp.mozilla.org/pub/firefox/releases/latest/README.txt
+lang=en-US
 
 diewithmsg()
 {
@@ -22,35 +25,49 @@ diewithmsg()
 sanitychecker()
 {
     test -z "$1" && diewithmsg "Empty version string. Perhaps this script needs to be updated."
-    result=`echo "$1" | sed 's/\.//;s/b//;s/[0-9]//g'`
+    result=`echo "$1" | sed 's/\.//g;s/b//;s/[0-9]//g'`
     test -n "$result" && diewithmsg "The version string [$1] is wrong."
 }
 
-test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory"
+test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory channel[beta or empty for stable]"
 grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
 test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation directory"
 
-USERSAFE="$1"
-SRCDIR="$2"
+usersafe="$1"
+dfirefox="$2"
+channel="$3"
 
 id=`id -u` || diewithmsg "id failed!"
 
 if [ "$id" == "0" ]; then
+    realuser=`stat -c '%U' "$dfirefox"` || diewithmsg "Stat has failed."
+    if [ "$realuser" != "$usersafe" ]; then
+        echo -n "Applying permissions $usersafe:$usersafe for '$2' ... "
+        chown -R "$usersafe:$usersafe" "$dfirefox" && echo OK || diewithmsg "This mustn't happen."
+    fi
     echo -n "Dropping root privileges ... "
-    sudo -u "$USERSAFE" "$0" "$1" "$2"
-    exit 0
+    sudo -u "$usersafe" "$0" "$usersafe" "$dfirefox" "$channel"
+    exit $?
 fi
 
 echo "OK"
 echo "Running as user '$USER'."
 
+if [ "$channel" == "beta" ]; then
+    echo "Selected beta update channel"
+    channel="-beta" 
+else
+    echo "Selected stable update channel"
+    channel=""
+fi
+
 echo -n "Installed version: "
-versionhave=`grep -a '<label id="version">' "$SRCDIR/browser/omni.ja"  | sed 's/.*version">\(.*\)<\/label.*/\1/'`
+versionhave=`grep -a '<label id="version">' "$dfirefox/browser/omni.ja"  | sed 's/.*version">\(.*\)<\/label.*/\1/'`
 sanitychecker "$versionhave"
 echo "$versionhave"
 
 echo -n "Available version: "
-versionnext=`wget --spider 'https://download.mozilla.org/?product=firefox-beta-latest&os=linux64&lang=en-US' 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
+versionnext=`wget --spider "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$lang" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
 sanitychecker "$versionnext"
 echo "$versionnext"
 
@@ -67,7 +84,7 @@ wget -q "$url" && echo "OK" || diewithmsg "wget failed"
 mv "$mar" "update.mar" || diewithmsg "Renaming of $mar failed"
 
 echo "Applying update ..."
-LD_LIBRARY_PATH="$SRCDIR" "$SRCDIR/updater" "$workdir" "$SRCDIR" "$SRCDIR"
+LD_LIBRARY_PATH="$dfirefox" "$dfirefox/updater" "$workdir" "$dfirefox" "$dfirefox"
 
 echo -n "Cleaning up ... "
 rm -rf "$workdir" && echo OK
