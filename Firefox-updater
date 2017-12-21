@@ -78,7 +78,7 @@ test -d "$workdir" || die "Unable to create a working directory"
 cd "$workdir" || diewithmsg "Unable to enter a working directory"
 
 mar="firefox-$versionhave-$versionnext.partial.mar"
-url="https://ftp.mozilla.org/pub/firefox/releases/$versionnext/update/linux-x86_64/en-US/$mar"
+url="https://ftp.mozilla.org/pub/firefox/releases/$versionnext/update/linux-x86_64/$lang/$mar"
 echo -n "Downloading delta from $versionhave to $versionnext [$url] ... "
 wget -q "$url" && echo "OK" || diewithmsg "wget failed"
 mv "$mar" "update.mar" || diewithmsg "Renaming of $mar failed"
