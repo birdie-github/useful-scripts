@@ -35,7 +35,6 @@ test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation dir
 
 usersafe="$1"
 dfirefox="$2"
-channel="$3"
 
 id=`id -u` || diewithmsg "id failed!"
 
@@ -53,7 +52,7 @@ fi
 echo "OK"
 echo "Running as user '$USER'."
 
-if [ "$channel" == "beta" ]; then
+if [ "$3" == "beta" ]; then
     echo "Selected beta update channel"
     channel="-beta" 
 else
@@ -74,7 +73,7 @@ echo "$versionnext"
 test "$versionhave" == "$versionnext" && echo "You're up to date. Exiting." && exit 0
 
 workdir=`mktemp -d`
-test -d "$workdir" || die "Unable to create a working directory"
+test -d "$workdir" || diewithmsg "Unable to create a working directory"
 cd "$workdir" || diewithmsg "Unable to enter a working directory"
 
 mar="firefox-$versionhave-$versionnext.partial.mar"
