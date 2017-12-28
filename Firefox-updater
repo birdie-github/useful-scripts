@@ -33,40 +33,37 @@ test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_in
 grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
 test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation directory"
 
-usersafe="$1"
-dfirefox="$2"
-
 id=`id -u` || diewithmsg "id failed!"
 
 if [ "$id" == "0" ]; then
-    realuser=`stat -c '%U' "$dfirefox"` || diewithmsg "Stat has failed."
-    if [ "$realuser" != "$usersafe" ]; then
-        echo -n "Applying permissions $usersafe:$usersafe for '$2' ... "
-        chown -R "$usersafe:$usersafe" "$dfirefox" && echo OK || diewithmsg "This mustn't happen."
+    realuser=`stat -c '%U' "$2"` || diewithmsg "Stat has failed."
+    if [ "$realuser" != "$1" ]; then
+        echo -n "Applying permissions $1:$1 for '$2' ... "
+        chown -R "$1:$1" "$2" && echo OK || diewithmsg "This mustn't happen."
     fi
     echo -n "Dropping root privileges ... "
-    sudo -u "$usersafe" "$0" "$usersafe" "$dfirefox" "$channel"
+    sudo -u "$1" "$0" "$1" "$2" "$3"
     exit $?
 fi
 
 echo "OK"
-echo "Running as user '$USER'."
+echo "Running as user '`id -un`'."
 
 if [ "$3" == "beta" ]; then
-    echo "Selected beta update channel"
+    echo "Selected BETA update channel"
     channel="-beta" 
 else
-    echo "Selected stable update channel"
+    echo "Selected STABLE update channel"
     channel=""
 fi
 
 echo -n "Installed version: "
-versionhave=`grep -a '<label id="version">' "$dfirefox/browser/omni.ja"  | sed 's/.*version">\(.*\)<\/label.*/\1/'`
+versionhave=`grep -a '<label id="version">' "$2/browser/omni.ja"  | sed 's/.*version">\(.*\)<\/label.*/\1/'`
 sanitychecker "$versionhave"
 echo "$versionhave"
 
 echo -n "Available version: "
-versionnext=`wget --spider "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$lang" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
+versionnext=`wget --spider  --timeout=5 "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$lang" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
 sanitychecker "$versionnext"
 echo "$versionnext"
 
@@ -83,7 +80,7 @@ wget -q "$url" && echo "OK" || diewithmsg "wget failed"
 mv "$mar" "update.mar" || diewithmsg "Renaming of $mar failed"
 
 echo "Applying update ..."
-LD_LIBRARY_PATH="$dfirefox" "$dfirefox/updater" "$workdir" "$dfirefox" "$dfirefox"
+LD_LIBRARY_PATH="$2" "$2/updater" "$workdir" "$2" "$2"
 
 echo -n "Cleaning up ... "
 rm -rf "$workdir" && echo OK
