@@ -25,11 +25,11 @@ diewithmsg()
 sanitychecker()
 {
     test -z "$1" && diewithmsg "Empty version string. Perhaps this script needs to be updated."
-    result=`echo "$1" | sed 's/\.//g;s/b//;s/[0-9]//g'`
+    result=`echo "$1" | sed 's/\.//g;s/b//;s/[0-9]//g;s/esr//'`
     test -n "$result" && diewithmsg "The version string [$1] is wrong."
 }
 
-test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory channel[beta or empty for stable]"
+test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory channel[beta, esr or empty for stable]"
 grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
 test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation directory"
 
@@ -51,14 +51,22 @@ echo "Running as user '`id -un`'."
 
 if [ "$3" == "beta" ]; then
     echo "Selected BETA update channel"
-    channel="-beta" 
+    channel="-beta"
+elif [ "$3" == "esr" ]; then
+    echo "Selected ESR update channel"
+    channel="-esr"
 else
     echo "Selected STABLE update channel"
     channel=""
 fi
 
+if [ "$3" == "esr" ]; then
+    versionhave=`awk -F = '/Milestone/{print $2}' "$2/platform.ini" 2>&1`"esr"
+else
+    versionhave=`grep -a '<label id="version">' "$2/browser/omni.ja" 2>&1 | sed 's/.*version">\(.*\)<\/label.*/\1/'`
+fi
+
 echo -n "Installed version: "
-versionhave=`grep -a '<label id="version">' "$2/browser/omni.ja"  | sed 's/.*version">\(.*\)<\/label.*/\1/'`
 sanitychecker "$versionhave"
 echo "$versionhave"
 
