@@ -6,12 +6,14 @@
 #
 # Author: Artem S. Tashkinov
 # Created at: Wed Dec 20 13:50 +05 2017
-#             Thu Dec 21 13:08 +05 2017 - remove hard coded values & update channel
 # Computer: localhost.localdomain
 # System: Linux 4.14.3-300.fc27.x86_64 on x86_64
 #
 # Copyright (c) 2017 Artem S. Tashkinov  All rights reserved.
 #----------------------------------------------------------------------
+
+# Comment out to disable or set the number to add an iptables rule for the OUTPUT chain
+firewall=6
 
 # See the list of available languages here: https://ftp.mozilla.org/pub/firefox/releases/latest/README.txt
 lang=en-US
@@ -36,6 +38,10 @@ test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation dir
 id=`id -u` || diewithmsg "id failed!"
 
 if [ "$id" == "0" ]; then
+    if [  -n "$firewall" -a -z "`iptables-save | grep games`" ]; then
+        echo -n "Adding iptables rule number $firewall for the user $1 ... "
+        iptables -I OUTPUT "$firewall" -p tcp -m owner --uid-owner "$1" -j ACCEPT && echo OK || diewithmsg "Failed"
+    fi
     realuser=`stat -c '%U' "$2"` || diewithmsg "Stat has failed."
     if [ "$realuser" != "$1" ]; then
         echo -n "Applying permissions $1:$1 for '$2' ... "
