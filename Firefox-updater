@@ -23,7 +23,7 @@ diewithmsg()
 
 sanitychecker()
 {
-    test -z "$1" && diewithmsg "Empty version string. Perhaps this script needs to be updated."
+    test -z "$1" && diewithmsg "Empty version string. Perhaps this script needs to be updated or wget failed."
     result=`echo "$1" | sed 's/\.//g;s/b//;s/[0-9]//g;s/esr//'`
     test -n "$result" && diewithmsg "The version string [$1] is wrong."
 }
@@ -32,6 +32,9 @@ extractversion()
 {
     unzip -p "$1/omni.ja" modules/AppConstants.jsm 2>/dev/null | egrep "MOZ_APP_VERSION_DISPLAY|MOZ_UPDATE_CHANNEL|INSTALL_LOCALE" | sed 's/: /=/;s/,//'
 }
+
+unzip -v &> /dev/null || diewithmsg "Please install unzip first!"
+wget  -V &> /dev/null || diewithmsg "Please install wget first!"
 
 test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory"
 grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
