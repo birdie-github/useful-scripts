@@ -13,10 +13,7 @@
 #----------------------------------------------------------------------
 
 # Comment out to disable or set the number to add an iptables rule for the OUTPUT chain
-firewall=6
-
-# See the list of available languages here: https://ftp.mozilla.org/pub/firefox/releases/latest/README.txt
-lang=en-US
+# firewall=6
 
 diewithmsg()
 {
@@ -31,7 +28,12 @@ sanitychecker()
     test -n "$result" && diewithmsg "The version string [$1] is wrong."
 }
 
-test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory channel[beta, esr or empty for stable]"
+extractversion()
+{
+    unzip -p "$1/omni.ja" modules/AppConstants.jsm 2>/dev/null | egrep "MOZ_APP_VERSION_DISPLAY|MOZ_UPDATE_CHANNEL|INSTALL_LOCALE" | sed 's/: /=/;s/,//'
+}
+
+test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory"
 grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
 test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation directory"
 
@@ -48,28 +50,28 @@ if [ "$id" == "0" ]; then
         chown -R "$1:$1" "$2" && echo OK || diewithmsg "This mustn't happen."
     fi
     echo -n "Dropping root privileges ... "
-    sudo -u "$1" "$0" "$1" "$2" "$3"
+    sudo -u "$1" "$0" "$1" "$2"
     exit $?
 fi
 
 echo "OK"
 echo "Running as user '`id -un`'."
 
-if [ "$3" == "beta" ]; then
-    echo "Selected BETA update channel"
-    channel="-beta"
-elif [ "$3" == "esr" ]; then
-    echo "Selected ESR update channel"
-    channel="-esr"
-else
-    echo "Selected STABLE update channel"
-    channel=""
-fi
+source <(extractversion "$2")
+versionhave="$MOZ_APP_VERSION_DISPLAY"
 
-if [ "$3" == "esr" ]; then
-    versionhave=`awk -F = '/Milestone/{print $2}' "$2/platform.ini" 2>&1`"esr"
+echo "Locale: $INSTALL_LOCALE"
+
+if [ "$MOZ_UPDATE_CHANNEL" == "beta" ]; then
+    echo "Selected the BETA update channel"
+    channel="-beta"
+elif [ "$MOZ_UPDATE_CHANNEL" == "esr" ]; then
+    echo "Selected the ESR update channel"
+    channel="-esr"
+    versionhave="${versionhave}esr"
 else
-    versionhave=`grep -a '<label id="version">' "$2/browser/omni.ja" 2>&1 | sed 's/.*version">\(.*\)<\/label.*/\1/'`
+    echo "Selected the STABLE update channel"
+    channel=""
 fi
 
 echo -n "Installed version: "
