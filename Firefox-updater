@@ -82,7 +82,7 @@ sanitychecker "$versionhave"
 echo "$versionhave"
 
 echo -n "Available version: "
-versionnext=`wget --spider  --timeout=5 "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$lang" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
+versionnext=`wget --spider  --timeout=5 "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$INSTALL_LOCALE" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
 sanitychecker "$versionnext"
 echo "$versionnext"
 
@@ -93,7 +93,7 @@ test -d "$workdir" || diewithmsg "Unable to create a working directory"
 cd "$workdir" || diewithmsg "Unable to enter a working directory"
 
 mar="firefox-$versionhave-$versionnext.partial.mar"
-url="https://ftp.mozilla.org/pub/firefox/releases/$versionnext/update/linux-x86_64/$lang/$mar"
+url="https://ftp.mozilla.org/pub/firefox/releases/$versionnext/update/linux-x86_64/$INSTALL_LOCALE/$mar"
 echo -n "Downloading delta from $versionhave to $versionnext [$url] ... "
 wget -q "$url" && echo "OK" || diewithmsg "wget failed"
 mv "$mar" "update.mar" || diewithmsg "Renaming of $mar failed"
