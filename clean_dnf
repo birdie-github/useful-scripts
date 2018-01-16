@@ -1,0 +1,49 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: script for rpm uninstallation within all installed rpms
+#
+# Author:  Artem S. Tashkinov
+# Created at:
+#             Mon Nov 21 20:12:04 +05 2016 - dnf, show deps, no clear
+#             Wed Dec 13 19:43:00 +05 2017 - remove by mask, skip already deleted, skip protected
+#
+# Copyright (c) 2004 Artem S. Tashkinov. All rights reserved.
+#----------------------------------------------------------------------
+
+clear
+
+resolve()
+{
+	result=`dnf -C --assumeno remove "$1" 2>&1`
+	protect=`echo "$result" | grep "protected packages"`
+	if [ -z "$protect" ]; then
+		myself=`echo "$result" | awk '/@/{print $1"-"$3"."$2}'`
+		if [ "$myself" == "$1" ]; then
+			echo "[OK]: no dependencies found."
+		else
+			echo -n "[WARN]: Dependent on $1: "
+			echo "$result" | awk 'BEGIN{ORS=", "}/@/{print $1}' | sed 's/, $/\n/'
+		fi
+		echo -n "Remove (n)? "
+	else
+		echo    "[ERROR]:$protect"
+		echo -n "[ERROR]: Hit enter to continue ... "
+	fi
+}
+
+some="."
+test -n "$1" && some="$1"
+
+for i in `rpm -qa | sort | grep "$some"`; do
+#	clear
+	if rpm -qi "$i"; then
+		resolve "$i" &
+		read answer
+		if [ "$answer" == "Y" -o "$answer" == "y" ]; then
+			dnf -C remove "$i"
+		fi
+	else
+		echo "[WARNING]: Package "$i" has already been removed"
+	fi
+	echo "________________________________________________________________"
+done
