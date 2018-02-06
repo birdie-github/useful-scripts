@@ -33,6 +33,11 @@ extractversion()
     unzip -p "$1/omni.ja" modules/AppConstants.jsm 2>/dev/null | egrep "MOZ_APP_VERSION_DISPLAY|MOZ_UPDATE_CHANNEL|INSTALL_LOCALE" | sed 's/: /=/;s/,//'
 }
 
+fetch()
+{
+    wget --show-progress --progress=dot:giga -O update.mar "$1"
+}
+
 unzip -v &> /dev/null || diewithmsg "Please install unzip first!"
 wget  -V &> /dev/null || diewithmsg "Please install wget first!"
 
@@ -91,16 +96,22 @@ sanitychecker "$versionnext"
 echo "$versionnext"
 
 test "$versionhave" == "$versionnext" && echo "You're up to date. Exiting." && exit 0
+test `echo "$versionhave" | sed 's/\.//g;s/esr//;s/b//'` -gt `echo "$versionnext" | sed 's/\.//g;s/esr//;s/b//'` && diewithmsg "The installed version is newer than the available update! Perhaps you've updated manually."
 
 workdir=`mktemp -d`
 test -d "$workdir" || diewithmsg "Unable to create a working directory"
 cd "$workdir" || diewithmsg "Unable to enter a working directory"
 
-mar="firefox-$versionhave-$versionnext.partial.mar"
-url="https://ftp.mozilla.org/pub/firefox/releases/$versionnext/update/linux-x86_64/$INSTALL_LOCALE/$mar"
-echo -n "Downloading delta from $versionhave to $versionnext [$url] ... "
-wget -q "$url" && echo "OK" || diewithmsg "wget failed"
-mv "$mar" "update.mar" || diewithmsg "Renaming of $mar failed"
+url_base="https://ftp.mozilla.org/pub/firefox/releases/$versionnext/update/linux-x86_64/$INSTALL_LOCALE"
+upd_incr="firefox-$versionhave-$versionnext.partial.mar"
+upd_full="firefox-$versionnext.complete.mar"
+url_incr="$url_base/$upd_incr"
+url_full="$url_base/$upd_full"
+echo -e "\nTrying to download delta from $versionhave to $versionnext ... "
+if ! fetch "$url_incr"; then
+    echo "Trying to download full update to $versionnext ... "
+    fetch "$url_full" || diewithmsg "Cannot download neither update"
+fi
 
 echo "Applying update ..."
 LD_LIBRARY_PATH="$2" "$2/updater" "$workdir" "$2" "$2"
