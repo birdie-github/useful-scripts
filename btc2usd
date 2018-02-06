@@ -1,8 +1,9 @@
 #! /bin/bash
 
 if jq --version &>/dev/null; then
-    price=`curl --silent --max-time 3 http://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'`
-    printf " $%'.f " " $price" 2>&1 # Yeah, show everything even if we have errors (so that the user knew that this script has broken
+    price1=`curl --silent --max-time 3 https://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
+    price2=`curl --silent --max-time 3 https://api.coinmarketcap.com/v1/ticker/bitcoin/  2>/dev/null | jq '.[] | .price_usd | tonumber'`
+    printf " %'.f %'.f " "$price1" "$price2" 2>/dev/null
 else
     echo "Install jq"
 fi
