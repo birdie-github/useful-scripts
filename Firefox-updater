@@ -35,7 +35,7 @@ extractversion()
 
 fetch()
 {
-    wget --show-progress --progress=dot:giga -O update.mar "$1"
+    wget --progress=dot:giga -O update.mar "$1"
 }
 
 unzip -v &> /dev/null || diewithmsg "Please install unzip first!"
