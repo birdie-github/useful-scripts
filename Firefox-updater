@@ -48,10 +48,11 @@ test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation dir
 id=`id -u` || diewithmsg "id failed!"
 
 if [ "$id" == "0" ]; then
-    if [  -n "$firewall" -a -z "`iptables-save | grep games`" ]; then
+    if [  -n "$firewall" -a -z "`iptables-save | grep uid-owner\ $1`" ]; then
         echo -n "Adding iptables rule number $firewall for the user $1 ... "
-        # FIXME: will add a firewall rule indefinitely
         iptables -I OUTPUT "$firewall" -p tcp -m owner --uid-owner "$1" -j ACCEPT && echo OK || diewithmsg "Failed"
+    else
+        echo "An iptables rule is already active"
     fi
     realuser=`stat -c '%U' "$2"` || diewithmsg "Stat has failed."
     if [ "$realuser" != "$1" ]; then
