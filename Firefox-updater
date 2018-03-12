@@ -48,11 +48,13 @@ test -f "$2/firefox" || diewithmsg "'$2' is not a valid Firefox installation dir
 id=`id -u` || diewithmsg "id failed!"
 
 if [ "$id" == "0" ]; then
-    if [  -n "$firewall" -a -z "`iptables-save | grep uid-owner\ $1`" ]; then
-        echo -n "Adding iptables rule number $firewall for the user $1 ... "
-        iptables -I OUTPUT "$firewall" -p tcp -m owner --uid-owner "$1" -j ACCEPT && echo OK || diewithmsg "Failed"
-    else
-        echo "An iptables rule is already active"
+    if [ -n "$firewall" ]; then
+        if [ -z "`iptables-save | grep uid-owner\ $1`" ]; then
+            echo -n "Adding iptables rule number $firewall for the user $1 ... "
+            iptables -I OUTPUT "$firewall" -p tcp -m owner --uid-owner "$1" -j ACCEPT && echo OK || diewithmsg "Failed"
+        else
+            echo "An iptables rule is already active"
+        fi
     fi
     realuser=`stat -c '%U' "$2"` || diewithmsg "Stat has failed."
     if [ "$realuser" != "$1" ]; then
@@ -91,13 +93,16 @@ echo "$versionhave"
 echo -n "Available version: "
 versionnext="$3"
 if [ -z "$3" ]; then
-    versionnext=`wget --spider  --timeout=5 "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$INSTALL_LOCALE" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
+    versionnext=`wget --spider --timeout=5 "https://download.mozilla.org/?product=firefox$channel-latest&os=linux64&lang=$INSTALL_LOCALE" 2>&1 | grep Location | sed 's/.*releases\/\(.*\)\/linux.*/\1/'`
 fi
 sanitychecker "$versionnext"
 echo "$versionnext"
 
 test "$versionhave" == "$versionnext" && echo "You're up to date. Exiting." && exit 0
-test `echo "$versionhave" | sed 's/\.//g;s/esr//;s/b//'` -gt `echo "$versionnext" | sed 's/\.//g;s/esr//;s/b//'` && diewithmsg "The installed version is newer than the available update! Perhaps you've updated manually."
+norm_vershave=`echo "$versionhave" | sed 's/esr//;s/b//;s/\.//2'` # replace the second dot with nothing to create a valid number
+norm_versnext=`echo "$versionnext" | sed 's/esr//;s/b//;s/\.//2'`
+# bc: the result of all boolean operations are 0 and 1 (for false and true) as in relational expressions.
+test "`echo "$norm_vershave > $norm_versnext" | bc -l`" -eq 1 && diewithmsg "The installed version is newer than the available update! Perhaps you've updated manually."
 
 workdir=`mktemp -d`
 test -d "$workdir" || diewithmsg "Unable to create a working directory"
