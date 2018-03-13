@@ -13,7 +13,7 @@
 #----------------------------------------------------------------------
 
 # Comment out to disable or set the number to add an iptables rule for the OUTPUT chain
-firewall=6
+# firewall=6
 
 diewithmsg()
 {
@@ -40,6 +40,7 @@ fetch()
 
 unzip -v &> /dev/null || diewithmsg "Please install unzip first!"
 wget  -V &> /dev/null || diewithmsg "Please install wget first!"
+bc    -v &> /dev/null || diewithmsg "Please install bc first!"
 
 test -z "$2" && diewithmsg "Usage is: `basename "$0"` user_for_update firefox_installation_directory forced_new_version[optional]"
 grep -qw "$1" /etc/passwd || diewithmsg "Unable to find the user '$1'"
@@ -99,9 +100,6 @@ sanitychecker "$versionnext"
 echo "$versionnext"
 
 test "$versionhave" == "$versionnext" && echo "You're up to date. Exiting." && exit 0
-# ( 58.0.2  -> 58.02999  ) < ( 59.0    -> 59.0999  )
-# ( 59.0b14 -> 59.014999 ) < ( 59.0    -> 59.0999  )
-# ( 52.6.0e -> 52.60999  ) < ( 52.7.0e -> 52.70999 )
 norm_vershave=`echo "${versionhave}999" | sed 's/esr//;s/b//;s/\.//2'` # replace the second dot with nothing to create a valid number
 norm_versnext=`echo "${versionnext}999" | sed 's/esr//;s/b//;s/\.//2'`
 # bc: the result of all boolean operations are 0 and 1 (for false and true) as in relational expressions.
