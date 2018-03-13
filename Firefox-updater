@@ -13,7 +13,7 @@
 #----------------------------------------------------------------------
 
 # Comment out to disable or set the number to add an iptables rule for the OUTPUT chain
-# firewall=6
+firewall=6
 
 diewithmsg()
 {
@@ -56,11 +56,11 @@ if [ "$id" == "0" ]; then
             echo "An iptables rule is already active"
         fi
     fi
-    realuser=`stat -c '%U' "$2"` || diewithmsg "Stat has failed."
-    if [ "$realuser" != "$1" ]; then
-        echo -n "Applying permissions $1:$1 for '$2' ... "
-        chown -R "$1:$1" "$2" && echo OK || diewithmsg "This mustn't happen."
-    fi
+
+    # Change files/directories ownership unconditionally
+    echo -n "Applying permissions $1:$1 for '$2' ... "
+    chown -Rc "$1:$1" "$2" && echo OK || diewithmsg "This mustn't happen."
+
     echo -n "Dropping root privileges ... "
     sudo -u "$1" "$0" "$1" "$2" "$3"
     exit $?
@@ -99,8 +99,11 @@ sanitychecker "$versionnext"
 echo "$versionnext"
 
 test "$versionhave" == "$versionnext" && echo "You're up to date. Exiting." && exit 0
-norm_vershave=`echo "$versionhave" | sed 's/esr//;s/b//;s/\.//2'` # replace the second dot with nothing to create a valid number
-norm_versnext=`echo "$versionnext" | sed 's/esr//;s/b//;s/\.//2'`
+# ( 58.0.2  -> 58.02999  ) < ( 59.0    -> 59.0999  )
+# ( 59.0b14 -> 59.014999 ) < ( 59.0    -> 59.0999  )
+# ( 52.6.0e -> 52.60999  ) < ( 52.7.0e -> 52.70999 )
+norm_vershave=`echo "${versionhave}999" | sed 's/esr//;s/b//;s/\.//2'` # replace the second dot with nothing to create a valid number
+norm_versnext=`echo "${versionnext}999" | sed 's/esr//;s/b//;s/\.//2'`
 # bc: the result of all boolean operations are 0 and 1 (for false and true) as in relational expressions.
 test "`echo "$norm_vershave > $norm_versnext" | bc -l`" -eq 1 && diewithmsg "The installed version is newer than the available update! Perhaps you've updated manually."
 
