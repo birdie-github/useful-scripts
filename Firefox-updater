@@ -28,6 +28,13 @@ sanitychecker()
     test -n "$result" && diewithmsg "The version string [$1] is wrong."
 }
 
+normalize()
+{
+    # Add .0 for XX.0 releases, i.e. 60.0 becomes 60.0.0; remove esr; remove beta; awk: 60.1.2 -> 60 000 000 + 1000 + 2
+    # will fail to upgrade beta to release
+    echo "$1" | sed 's/^[0-9]*\.0$/\0.0/;s/esr//;s/b/\./' | awk -F "." '{print $1*1000000+$2*1000+$3}'
+}
+
 extractversion()
 {
     unzip -p "$1/omni.ja" modules/AppConstants.jsm 2>/dev/null | egrep "MOZ_APP_VERSION_DISPLAY|MOZ_UPDATE_CHANNEL|INSTALL_LOCALE" | sed 's/: /=/;s/,//'
@@ -100,8 +107,9 @@ sanitychecker "$versionnext"
 echo "$versionnext"
 
 test "$versionhave" == "$versionnext" && echo "You're up to date. Exiting." && exit 0
-norm_vershave=`echo "${versionhave}999" | sed 's/esr//;s/b//;s/\.//2'` # replace the second dot with nothing to create a valid number
-norm_versnext=`echo "${versionnext}999" | sed 's/esr//;s/b//;s/\.//2'`
+
+norm_vershave=`normalize "$versionhave"`
+norm_versnext=`normalize "$versionnext"`
 # bc: the result of all boolean operations are 0 and 1 (for false and true) as in relational expressions.
 test "`echo "$norm_vershave > $norm_versnext" | bc -l`" -eq 1 && diewithmsg "The installed version is newer than the available update! Perhaps you've updated manually."
 
