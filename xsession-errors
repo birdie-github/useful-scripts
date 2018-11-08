@@ -1,0 +1,4 @@
+#! /bin/bash
+
+# This works in modern Linux distros and under Wayland as well
+journalctl _UID=`id --user`
