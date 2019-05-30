@@ -38,6 +38,9 @@ normalize()
 extractversion()
 {
     unzip -p "$1/omni.ja" modules/AppConstants.jsm 2>/dev/null | egrep "MOZ_APP_VERSION_DISPLAY|MOZ_UPDATE_CHANNEL|INSTALL_LOCALE" | sed 's/: /=/;s/,//'
+    # Firefox 68 fix
+    flocale=`unzip -p "$1/omni.ja" modules/AppConstants.jsm 2>/dev/null | grep INSTALL_LOCALE`
+    test -z "$flocale" && echo "INSTALL_LOCALE=`unzip -p "$1/omni.ja" update.locale 2>/dev/null`"
 }
 
 fetch()
