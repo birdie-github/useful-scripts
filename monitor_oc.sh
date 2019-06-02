@@ -2,11 +2,21 @@
 
 # Jun  2 03:00 2019
 
-# Adjust according to your needs
-width=1920
-height=1080
-freq=74
+cvt --help || exit 1
 
+if [ -z "$3" ]; then
+    echo "No parameters were given (`basename "$0"` width height freq), using defaults"
+    # Adjust according to your needs
+    width=1920
+    height=1080
+    freq=74
+else
+    width=$1
+    height=$2
+    freq=$3
+fi
+
+echo "Width: $width; height: $height; refresh rate: $freq"
 name=${width}x${height}_${freq}.00
 
 test -n "`xrandr | grep $name`" && echo "$name is already added" && exit 1
