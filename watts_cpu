@@ -1,0 +1,18 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: show CPU package power consumption
+# Author: Artem S. Tashkinov
+# Created at: 2019-09-04 14:17:52
+#
+# Copyright (c) 2019 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+test ! -e /dev/cpu/0/msr && echo "MSR module not loaded. Exiting" && exit 1
+test ! -r /dev/cpu/0/msr && echo "No permissions to read MSR. Exiting" && exit 2
+
+interval=1
+test -n "$1" && interval=$1
+turbostat --quiet --num_iterations 1 --interval "$interval" --show PkgWatt --Summary | tail -1 | tr -d '\n'
+echo "W"
