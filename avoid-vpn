@@ -1,0 +1,32 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: avoid VPN for certain either predefined or given hosts
+#              Works only for IPv4
+#
+# Author: Artem S. Tashkinov
+# Created at: Mon Jan  1 22:09:05 2018
+#             Thu Jan 31 15:40:07 2019 exclude tun when looking for a defgw
+# Computer: localhost.localdomain
+# System: Linux 4.14.10-ic64 on x86_64
+#
+# Copyright (c) 2018 Artem S. Tashkinov  All rights reserved.
+#----------------------------------------------------------------------
+
+default=( "irc.freenode.net" "en.wikipedia.org" "distrowatch.com" "wiki.debian.org" )
+(( $# == 0 )) && set -- "${default[@]}" # Set arguments to $default if no command line arguments are given
+defgw=`ip r | grep -v tun | awk '/default via/{print $3}'`
+test -z "$defgw" && echo "Default gateway is not defined" && exit 1
+echo "Default gateway is $defgw"
+
+for i in "$@"; do
+    echo "Routing $i ... "
+    for IP in `host "$i" | awk '/has address/{print $4}'`; do
+        echo -n "  $IP    : "
+        if [ -z "`ip r | grep -w "$IP"`" ]; then
+            ip r a "$IP/32" via "$defgw" && echo "OK" || echo "failed"
+        else
+            echo "already routed"
+        fi
+    done
+done
