@@ -1,0 +1,246 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: Put CPU to and backto full powersave mode
+# Author: Artem S. Tashkinov
+# Created at: Sun Jun 19 00:14:40 2005
+# System: Linux 2.6.12-k8 on i686
+#
+# Thu Jul 1  19:18:10 2010
+#  1.0 Added SMP support
+#
+# Sun Dec 25 16:50:36 2011
+#  1.1 Completely reworked modules loading mechanism; userspace governor
+#
+# Sun Jul 22 05:30:16 2012
+#  1.2 Set/Reset; Improved output
+#
+# Mon Aug  6 00:46:25 2012
+#  1.2.1 unified userspace and maxfreq; unified everything; more error checkings
+#
+# Mon Feb 11 06:19:04 2013
+#  1.2.2 --now shows frequency in MHz
+#
+# Fri May  3 00:41:13 2013
+#  1.2.3 I've discovered that after suspend/resume max CPU cores 2, 3 and 4
+# frequences have been reset. This script "thought" those numbers are always
+# the same, now we tread carefully and check if they are indeed different
+#   Also fix userspace set frequency - maxfreq also has to be adjusted
+#
+# Sun Aug  6 03:01:58 2017
+#  1.2.4 add an option to show available frequencies
+#
+# Mon 14 Oct 2019 04:21:23 PM
+#  1.2.5 add boost support
+#        truncate the resulting frequencies
+#
+# Copyright (c) 2005-2019 Artem S. Tashkinov. All rights reserved.
+#----------------------------------------------------------------------
+
+#set -x
+
+version=1.2.4
+DRIVER=acpi_cpufreq
+lead=/sys/devices/system/cpu
+
+cpu0=$lead/cpu0/cpufreq
+max0=`cat $cpu0/cpuinfo_max_freq 2>/dev/null`
+lim0=`cat $cpu0/scaling_max_freq 2>/dev/null`
+boost=/sys/devices/system/cpu/cpufreq/boost
+SG=$lead/cpu*/cpufreq/scaling_governor
+SD=$cpu0/scaling_driver
+
+hz2mhz() # only ONE argument at a time!
+{
+	freq="$1"
+	test -z "$freq" && read freq
+	awk 'END{print int('$freq'/1000)"MHz"}' < /dev/null
+}
+
+setgov()
+{
+	echo "$1" | tee $SG > /dev/null
+	test -n "`cat $SG | grep -v "$1"`" && echo "Failed setting $1 governor!" && exit 100
+	echo "$1 mode has been activated"
+}
+
+getgov()
+{
+	echo "`cat $SG | sort | uniq` mode is currently activated."
+}
+
+boost()
+{
+	test ! -f "$boost" && echo "Boost is not supported" && return
+	echo -n "Boost: "
+	if [ -z "$1" ]; then
+		test "`cat $boost`" == "1" && echo "on" || echo "off"
+	else
+		arg=`echo "$1" | tr A-Z a-z`
+		if [ "$arg" == "1" -o "$arg" == "on" -o "$arg" == "yes" ]; then
+			echo "1" > $boost
+			test "`cat $boost`" == "1" && echo "enabled"  || echo "FAILED to enable"
+		else
+			echo "0" > $boost
+			test "`cat $boost`" == "0" && echo "disabled" || echo "FAILED to disable"
+		fi
+	fi
+}
+
+setspeed()
+{
+	allowed=`cat $cpu0/scaling_available_frequencies`
+	if [ -z "$2" ]; then
+		echo "Need an argument to continue."
+		echo "The possible frequences are: $allowed"
+		return 1
+	fi
+
+	if [ -z "`echo "$allowed" | grep -w "$2"`" ]; then
+		echo "'$2' is not amongst the allowed frequencies: "
+		echo $allowed
+		return 2
+	fi
+
+	if [ "$1" == "userspace" ]; then
+		setgov userspace
+		echo -n "Setting user defined frequency of `echo $2 | hz2mhz` ... "
+		echo "$2" | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
+		echo "$2" | tee $lead/cpu*/cpufreq/scaling_setspeed > /dev/null
+		[ "`cat $cpu0/scaling_cur_freq 2>/dev/null`" == "$2" ] && echo OK || echo Failed
+	elif [ "$1" == "maxfreq" ]; then
+		getgov
+		echo "Setting maximum frequency of `echo $2 | hz2mhz` ... "
+		echo "$2" | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
+		cat $lead/cpu*/cpufreq/scaling_max_freq
+	else
+		echo "Don't know what to do"
+	fi
+}
+
+if [ ! -f $SD -a "$1" != "-l" -a "$1" != "--load" ]; then
+	echo "Error: cpufrequency subsystem is not running!"
+	exit 1
+fi
+
+governors=`cat $cpu0/scaling_available_governors 2>&1`
+
+for i in performance conservative userspace powersave ondemand; do
+	cgovern=`echo $governors | grep $i`
+	if [ -z "$cgovern" ]; then
+		echo "CPU governor '$i' not found."
+		module="cpufreq_$i"
+		echo "Installing $module ... "
+		modprobe $module >/dev/null 2>&1
+		if [ "$?" != "0" ]; then
+			echo "Error: can't load $module module. Do you have it installed?"
+			exit 1
+		else
+			echo "OK"
+		fi
+	fi
+done
+
+test "$1" = "-l" -o "$1" = "--load" || current=`cat $SG`
+
+case $1 in
+	--version|-v) #print the version number
+		echo "`basename $0` version "$version
+		exit 0;;
+
+	--help|-h) #Display the help screen
+		echo "Usage: `basename $0` [OPTION]"
+		echo "	-M --maximum		- performance mode (minimum powersavings)"
+		echo "	-m --mimimum		- powersave mode (minimum performance)"
+		echo "	-a --auto		- ondemand mode (rapid auto performance)"
+		echo "	-b --boost		- enable/disable boost"
+		echo "	-c --conservative	- conservative mode (gradual auto performance)"
+		echo "	-u --userspace FREQ	- user defined CPU frequency"
+		echo "	-l --load		- load CPU powersave driver"
+		echo "	-n --now		- show current mode"
+		echo "	-s --set FREQ		- set maximum CPU frequency"
+		echo "	-r --reset		- reset maximum CPU frequency"
+		echo "	-f --frequencies	- show available frequencies"
+		echo "	-v --version		- show application version and exit"
+		echo "	-h --help		- show this help and exit"
+		exit 0;;
+
+	--load|-l)
+		KDRIVER=`echo $DRIVER | sed 's/-/_/g'`
+		if [ -z "`lsmod | grep $KDRIVER`" ]; then
+			modprobe $DRIVER && echo "CPU powersave driver has been loaded successfully"
+		else
+			echo "CPU powersave driver is already loaded"
+		fi
+		exit;;
+
+	--userspace|-u)
+		setspeed userspace "$2"
+		exit;;
+
+	--conservative|-c)
+		setgov conservative
+		exit;;
+
+	--minimum|-m)
+		setgov powersave
+		exit;;
+
+	--maximum|-M)
+		setgov performance
+		exit;;
+
+	--set|-s)
+		setspeed maxfreq "$2"
+		exit;;
+
+	--reset|-r)
+		getgov
+		echo "Resetting maximum frequency ... "
+		echo $max0 | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
+		cat $lead/cpu*/cpufreq/scaling_max_freq
+		exit;;
+
+	--auto|-a)
+		setgov ondemand
+		exit;;
+
+	--boost|-b)
+		boost "$2"
+		exit;;
+
+	--frequencies|-f)
+		echo -n "The available frequencies are: "
+		cat $cpu0/scaling_available_frequencies
+		exit;;
+
+	--now|-n|*)
+		boost
+		getgov
+		for i in `cat $lead/cpu*/cpufreq/scaling_cur_freq`; do
+			hz2mhz "$i"
+		done
+
+		# Check if maximum CPU frequences are mixed or maxed out
+		for i in `cat $lead/cpu*/cpufreq/scaling_max_freq`; do
+			this=$i
+			test "$max0" != "$i" && notmaxed=1
+			test "$next" != "$this" -a -n "$vin" && nonuni=1 # vin - do not run on a first loop invocation
+			next=$this
+			vin=1
+		done
+
+		if [ -z "$notmaxed" ]; then
+			echo "No frequency limit is enforced."
+		else
+			if [ -n "$nonuni" ]; then
+				echo "Maximum CPU frequency per CPU is :"
+				for i in `cat $lead/cpu*/cpufreq/scaling_max_freq`; do
+					hz2mhz "$i"
+				done
+			else
+				echo "Maximum allowed frequency is `echo $lim0 | hz2mhz` (out of `echo $max0 | hz2mhz`)"
+			fi
+		fi
+
+		exit;;
+esac
