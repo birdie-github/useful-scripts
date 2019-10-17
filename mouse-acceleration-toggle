@@ -1,0 +1,40 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: toggle or change mouse acceleration using libinput
+#              Wed Jan 23 00:25:46 2019 : on/off argument
+# Author: Artem S. Tashkinov
+# Created at: Sun Jan 20 18:26:25 2019
+# Computer: localhost.localdomain
+# System: Linux 4.19.15-300.fc29.x86_64 on x86_64
+#
+# Copyright (c) 2019 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+test -z "$DISPLAY" && echo "DISPLAY is not set. Exiting" && exit -1
+
+mouse=`xinput list | grep Mouse | sed 's/.*id=\(.\).*/\1/'`
+current=`xinput --list-props "$mouse" | grep -i "Accel Profile Enabled (303)" | rev | cut -c -4 | rev` # alternatively tail -c 5
+
+w=`echo "$1" | tr '[:upper:]' '[:lower:]'`
+
+echo -n "[$current]"
+
+if [ "$current" = "1, 0" ]; then
+    echo -n " Mouse acceleration is ENABLED. "
+    test "$w" = "on"  && echo "" && exit 0
+    status="on"
+else
+    echo -n " Mouse acceleration is disabled. "
+    test "$w" = "off" && echo "" && exit 0
+    status="off"
+fi
+
+if [ "$status" = "on" -o "$w" = "off" ]; then
+    echo -n "Disabling ... "
+    xinput --set-prop "$mouse" 'libinput Accel Profile Enabled' 0, 1 && echo OK
+elif [ "$status" = "off" -o "$w" = "on" ]; then
+    echo -n "ENABLING ... "
+    xinput --set-prop "$mouse" 'libinput Accel Profile Enabled' 1, 0 && echo OK
+fi
