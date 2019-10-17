@@ -14,8 +14,6 @@
 # Copyright (c) 2018 Artem S. Tashkinov  All rights reserved.
 #----------------------------------------------------------------------
 
-# "pub.diforfree.org" "pub1.diforfree.org" "pub2.diforfree.org" - dead
-
 default=( "irc.freenode.net" "en.wikipedia.org" "distrowatch.com" "wiki.debian.org" )
 (( $# == 0 )) && set -- "${default[@]}" # Set arguments to $default if no command line arguments are given
 defgw=`ip r | grep -v tun | awk '/default via/{print $3}'`
