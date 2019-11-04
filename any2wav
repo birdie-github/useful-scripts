@@ -1,0 +1,17 @@
+#! /bin/bash
+
+# Tue Jan 7 17:57:16 2014
+# Convert any media file with an audio stream to a wav file
+
+# Mon 04 Nov 2019 10:09:46 PM
+# mplayer -> ffmpeg; replace file extension instead of appending it - requires bash
+
+for i in "$@"; do
+    echo -n "Processing '$i' ... "
+    test -n "`echo "$i" | grep '\.wav$'`" && echo "$i is already a wav file. Skipping" && continue
+    ext="${i##*.}"
+    wav="${i%.$ext}.wav"
+    test "$wav" == "$i" && wav="$i.wav" # In case I screwed up
+    test -f "$wav" && echo "$wav already exists. Skipping." && continue
+    ffmpeg -hide_banner -nostats -loglevel warning -i "$i" -map_metadata -1 -fflags +bitexact -vn "$wav" && echo "OK"
+done
