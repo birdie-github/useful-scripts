@@ -1,0 +1,83 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: watch raw input output per block device stats in real time
+# Author: Artem S. Tashkinov
+# Created at: Sat Apr  6 18:34:33 2013
+# Computer: localhost.localdomain
+# System: Linux 3.8.7-ic on i686
+#
+# Copyright (c) 2013 Artem S. Tashkinov  All rights reserved.
+# Sat Aug 24 19:59:32 2013 - implemented read/write interval counters
+# Sun Aug 25 23:51:14 2013 - made refreshing three times faster
+# Thu Feb  4 18:59:41 2016 - exit on pressing q/Q, read refresh rate from console
+#
+#----------------------------------------------------------------------
+
+shopt -s nullglob
+export LANG=en_US.UTF-8
+rr=2
+
+trap "exit 0" TERM
+export TOP_PID=$$
+
+qexit()
+{
+	read -n 1 -t 0.5 -s char
+	if [ "$char" = "q" -o "$char" = "Q" ]; then
+		echo "Bye"
+		kill -s TERM $TOP_PID
+	fi
+}
+
+if [ -n "$1" ]; then
+	if [ "$1" -eq "$1" ] 2>/dev/null; then
+		rr="$1"
+	else
+		echo "[$1] is not a number, setting refresh rate to $rr"
+		sleep 3
+	fi
+fi
+
+dsrc=/sys/block
+cd $dsrc || die "$dsrc not found"
+
+declare -A intr intw blkr blkw
+
+while :; do
+	clear
+	date | tr -d '\n'
+	echo "			[ refresh rate: ${rr} seconds ]"
+	echo "Device         Read bytes       Written bytes   Interval read Interval written Mount point"
+	for i in sd* md*; do # adjust for your environment
+		for j in $i/$i* $i; do
+			dev=${j##*/}
+			test -z "$dev" && dev="$j" # when iterating $i itself
+
+			read blkr blkw < <(awk '{print $3" "$7}' $j/stat) # let's speed up this a bit
+			blkr["$dev"]=$blkr
+			blkw["$dev"]=$blkw
+
+			test -z "${intr[$dev]}" && intr[$dev]=0
+			test -z "${intw[$dev]}" && intw[$dev]=0
+			intr[$dev]=$((${blkr[$dev]}-${intr[$dev]}))
+			intw[$dev]=$((${blkw[$dev]}-${intw[$dev]}))
+			test "${blkr[$dev]}" == "${intr[$dev]}" && intr[$dev]=0 # Don't show when iterating for the first time
+			test "${blkw[$dev]}" == "${intw[$dev]}" && intw[$dev]=0
+
+			printf "%-7s %'17d   %'17d  %'14d   %'14d " $dev $((blkr[$dev]*512)) $((blkw[$dev]*512)) $((intr[$dev]*512)) $((intw[$dev]*512))
+
+			mntp=`awk '/^\/dev\/'$dev' /{print $2}' /proc/mounts`
+			if [ -z "$mntp" ]; then
+				grep -q "root=/dev/$dev " /proc/cmdline && mntp="/"
+			fi
+			echo "$mntp"
+
+			intr["$dev"]=${blkr["$dev"]}
+			intw["$dev"]=${blkw["$dev"]}
+		done
+		echo
+	done
+	qexit < /dev/stdin &
+	sleep $rr
+done
