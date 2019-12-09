@@ -1,0 +1,34 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: show dmesg messages on the screen for modern Linux'es
+#              Fined tuned for lxdm-session
+#
+# Author: Artem S. Tashkinov
+# Created at: Tue 10 Dec 2019 03:29:57 AM
+# Computer: localhost.localdomain
+# System: Linux 5.4.2-zen2 on x86_64
+#
+# Copyright (c) 2019 Artem S. Tashkinov  All rights reserved.
+#----------------------------------------------------------------------
+
+icon=/path/to/icon_32x32.png
+timeout=3   # visual cue for this number of seconds
+
+nl='
+'
+
+journalctl -kf | while read -r line1; read -r -t 1 line2; read -r -t 1 line3; true; do
+
+    test -n "$line2" && line1="$line1$nl"
+    test -n "$line3" && line2="$line2$nl"
+
+    pid_lxdm=`pidof lxdm-session`
+    Xuser=0 # this might not work - needs to be tested
+    test -z "$pid_lxdm" || Xuser=`ps -u --ppid "$pid_lxdm" | tail -1 | awk '{print $1}'`
+
+    if [ -n "$Xuser" ]; then
+        su "$Xuser" -c "DISPLAY=:0 notify-send --expire-time="${timeout}000" --icon="${icon}" 'Kernel message' '$line1$line2$line3' &> /dev/null" &
+    fi
+
+done
