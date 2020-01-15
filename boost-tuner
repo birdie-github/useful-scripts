@@ -1,0 +1,33 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: enable CPU boost only when given applications are running
+#              will be unconditionally enabled if /tmp/boost exists
+#
+# Author: Artem S. Tashkinov
+# Created at: Sun 05 Jan 2020 06:57:51 PM
+# Computer: localhost.localdomain
+# System: Linux 5.4.2-zen2 on x86_64
+#
+# Copyright (c) 2020 Artem S. Tashkinov  All rights reserved.
+#----------------------------------------------------------------------
+
+interval=10
+apps="^gcc|^cpp|^ld|^make|^configure|^cmake"
+fileon=/tmp/boost
+
+handler=/sys/devices/system/cpu/cpufreq/boost
+
+while :; do
+
+    test ! -f "$handler" && echo "CPU frequency subsystem failure: boost not found" && exit 1
+    result=`ps axco command | egrep "$apps"`
+
+    if [ -n "$result" -o -f "$fileon" ]; then
+        echo 1 > "$handler"
+    else
+        echo 0 > "$handler"
+    fi
+
+    sleep $interval
+done
