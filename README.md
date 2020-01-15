@@ -1,7 +1,7 @@
 # Probably useful scripts
 
 ## [boost-tuner](https://raw.githubusercontent.com/birdie-github/useful-scripts/master/boost-tuner)
-I'm not content that my Ryzen 3700 CPU boosts so often and so much while I'm simply browsing the web (governor: ondemand) and that makes the CPU work at relatively high temperatures (45-60C, with an average run-of-the-mill air cooler and around 19C temperature in the room where I am) and voltages (1.5V voltage doesn't sound safe to me despite AMD assurance this voltage is 100% safe). This whole situation made me write a script which disables boost unless certain predefined processes are found to be running. At the moment I've allowed only compilation but you can add anything you want. To run it you may add it to /etc/rc.d/rc.local, e.g. this way:
+I'm not content that my Ryzen 3700 CPU boosts so often and so much while I'm simply browsing the web (governor: ondemand) and as a result that makes the CPU operate at relatively high temperatures (45-60C, with an average run-of-the-mill air cooler and around 19C temperature in the room where I am) and voltages (1.5V voltage doesn't sound safe to me despite AMD assurance this voltage is 100% safe). This whole situation made me write a script which disables boost unless certain predefined processes are found to be running. At the moment I've allowed only compilation but you can add anything you want. To run it you may add it to `/etc/rc.d/rc.local`, e.g. this way:
 `( sleep 60 && exec /root/bin/boost-tuner & ) &` # this is not to delay any further commands and probably to disable boost only after the user has logged on (60 seconds are more than enough to enter your password)
 
 ## [btc2usd](https://raw.githubusercontent.com/birdie-github/useful-scripts/master/btc2usd)
