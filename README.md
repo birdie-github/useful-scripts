@@ -15,3 +15,7 @@ Ever wanted to get rid of useless/unnecessary/redundant RPMs lying on your disk?
 
 ## [monitor_overclock](https://raw.githubusercontent.com/birdie-github/useful-scripts/master/monitor_overclock)
 This script allows you to overclock your monitor (refresh rate/frequency) under Linux. It was created specifically for my sole monitor, so you'll have to adjust it if yours is different. Modifications to /etc/X11/xorg.conf.d/conf.conf are [required](https://devtalk.nvidia.com/default/topic/1054885/linux/monitor-refresh-frequency-overclocking-in-linux-is-not-available/).
+
+## Bottom line
+
+To be honest I have close to a hundred such scripts but many of them are either silly or useful only for me. I publish them elsewhere.
