@@ -19,3 +19,5 @@ mkfs.ext4 -O ^huge_file,^has_journal /dev/device
 # My favourite pv invocation
 [nocache] pv -petrab /dev/source | tee /dev/destination | md5sum
 
+# Too tired of remembering all the flags required to launch Google Chrome, originally 2018-03-06 22:47:33
+env TZ=USA/Pacific FREETYPE_PROPERTIES=truetype:interpreter-version=35 chrome --disk-cache-dir=/tmp/.chrome-cache "$@"
