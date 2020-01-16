@@ -5,7 +5,7 @@ I'm not content that my Ryzen 3700 CPU boosts so often and so much while I'm sim
 `( sleep 60 && exec /root/bin/boost-tuner & ) &` # this is not to delay any further commands and probably to disable boost only after the user has logged on (60 seconds are more than enough to enter your password). It must be run under root. As a user you may force enable boost by creating /tmp/boost, e.g. `touch /tmp/boost`
 
 ## [btc2usd](https://raw.githubusercontent.com/birdie-github/useful-scripts/master/btc2usd)
-A shell script which shows the current bitcoin exchange rates for CoinDesk.com and CoinMarketCap.com in the United States dollars (USD). Requires the jq utility (can be installed in deb distros using `sudo apt-get install jq` or in RPM distros using `sudo yum install jq`). It could also be used under XFCE via the generic monitor applet.
+A shell script which shows the current bitcoin exchange rates for CoinDesk.com and CoinMarketCap.com in the United States dollars (USD). Requires the jq utility (can be installed in deb distros using `sudo apt-get install jq` or in Fedora using `sudo dnf install jq`). It could also be used under XFCE via the generic monitor applet.
 
 ## [Firefox-updater](https://raw.githubusercontent.com/birdie-github/useful-scripts/master/Firefox-updater)
 If you're unwilling to let your user account update Firefox (it's a little bit unsafe) I've created a script for this situation which could be added in a crontab. This script automatically updates the official Linux x86-64 Firefox distribution installed on your PC. It currently supports the ESR, stable and beta channels.
