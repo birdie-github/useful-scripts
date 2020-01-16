@@ -21,3 +21,9 @@ mkfs.ext4 -O ^huge_file,^has_journal /dev/device
 
 # Too tired of remembering all the flags required to launch Google Chrome, originally 2018-03-06 22:47:33
 env TZ=USA/Pacific FREETYPE_PROPERTIES=truetype:interpreter-version=35 chrome --disk-cache-dir=/tmp/.chrome-cache "$@"
+
+# Extract a cpio archive
+cpio -i -m -d -F "name.cpio"
+
+# Create a cpio archive
+find "directory" -depth | cpio -o -H crc -O "name.cpio"
