@@ -27,3 +27,6 @@ cpio -i -m -d -F "name.cpio"
 
 # Create a cpio archive
 find "directory" -depth | cpio -o -H crc -O "name.cpio"
+
+# Poll/watch NVIDIA GPU temperature and power consumption (with proprietary NVIDIA drivers) - e.g. for XFCE generic monitor
+nvidia-smi --query-gpu=temperature.gpu,power.draw --format=csv,noheader,nounits
