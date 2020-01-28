@@ -30,3 +30,6 @@ find "directory" -depth | cpio -o -H crc -O "name.cpio"
 
 # Poll/watch NVIDIA GPU temperature and power consumption (with proprietary NVIDIA drivers) - e.g. for XFCE generic monitor
 nvidia-smi --query-gpu=temperature.gpu,power.draw --format=csv,noheader,nounits
+
+# Compile VMWare kernel modules, 2009-08-30 05:35:03
+vmware-modconfig --console --install-all
