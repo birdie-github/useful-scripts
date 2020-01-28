@@ -1,0 +1,61 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: send a notification to a currently logged in user in X.org
+# Author: Artem S. Tashkinov
+# Created at: Thu Jan 16 22:57:14 2020
+# It took me three hours to write and debug it though it looks simple
+# Computer: zen
+# System: Linux 5.4.8-az2 on x86_64
+#
+# Copyright (c) 2020 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+msg_icon=/path/to/icon_32x32.png
+
+test -z "$3" && echo "Usage is `basename "$0"` timeout(seconds) title message" && exit 1
+timeout=$1
+
+# message type modern/classic
+mstype=modern
+
+if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+    echo "$1 is not an integer number."
+    exit 1
+fi
+
+
+whos() # print users whose sessions start with ":"  i.e Xorg users
+{
+    who | awk '{if ($2~/^:/) print}'
+}
+
+message() {
+    echo "Detected user:$1 DISPLAY=$2. Attempting to show a $mstype message ..."
+    if [ "$mstype" = "classic" ]; then
+        su "$1" -c "DISPLAY=$2 xmessage -center -timeout $timeout -title '$3' '$4'"
+    else
+        su "$1" -c "DISPLAY=$2 notify-send --expire-time="${timeout}000" --icon="$msg_icon" '$3' '$4'"
+    fi
+}
+
+pid_lxdm=`pidof lxdm-session`
+test -n "$pid_lxdm" && Xuser=`ps --no-headers -u --ppid "$pid_lxdm" | awk '{print $1}'`
+
+if [ -n "$Xuser" ]; then
+    # LXDM version
+    echo "LXDM session detected ..."
+    Xdisp=`ps --no-headers -u --ppid "$pid_lxdm" | awk '{print $2}'`
+    Xdisp=`tr '\0' '\n' < /proc/$Xdisp/environ | awk -F = '/^DISPLAY=/{print $2}'`
+    message "$Xuser" "$Xdisp" "$2 for ${timeout}sec" "$3"
+elif [ -n "`whos`" ]; then
+    # Universal version in case w does work (it doesn't for LXDM)
+    echo "who is working :)"
+    whos | while read Xuser Xdisp; do
+        message "$Xuser" "$Xdisp" "$2 for ${timeout}sec" "$3"
+    done
+else
+    echo "Attemptin to show a display login manager message ..."
+    message "root" ":0" "$2 for ${timeout}sec" "$3"
+fi
