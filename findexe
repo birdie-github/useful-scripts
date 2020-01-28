@@ -1,0 +1,21 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: find executables by name located in in the PATH
+#              environment variable
+#
+# Author:  Artem S. Tashkinov <>
+# Created at: Wed Jun 13 02:53:14 2001
+#             2001-11-03 22:22:37 Changes unknown
+#             Sat Mar  3 18:09:56 2018 Fix grep
+#             Tue Jan 28 18:34:45 2020 rewritten to be safe
+#
+# Copyright (c) 2004-2020 Artem S. Tashkinov. All rights reserved.
+#----------------------------------------------------------------------
+
+test -z "$1" && echo "Usage is `basename "$0"` name" && exit 1
+
+echo "$PATH" | awk -F : '{ for (i=1;i<=NF;i++) print $i }' | while read -r cdir; do
+    ls "$cdir" | grep -- "$1"
+done | while read -r name; do
+    /usr/bin/which "$name"
+done | sort
