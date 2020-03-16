@@ -2,7 +2,7 @@
 
 if jq --version &>/dev/null; then
     price1=`curl --silent --max-time 7 https://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
-    price2=`curl --silent --max-time 7 https://api.coinmarketcap.com/v1/ticker/bitcoin/  2>/dev/null | jq '.[] | .price_usd | tonumber'`
+    price2=`curl --silent --max-time 7 'https://widgets.coinmarketcap.com/v2/ticker/1/?ref=widget&convert=USD' 2>/dev/null | jq '.data.quotes.USD.price | tonumber'`
     printf " %'.f %'.f " "$price1" "$price2" 2>/dev/null
 else
     echo "Install jq"
