@@ -1,0 +1,32 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: replace VirtualBox own Qt libraries with system ones
+# Author: Artem S. Tashkinov
+# Created at: Thu Apr 16 03:44:38 2020
+# Computer: zen
+# System: Linux 5.6.3-az2 on x86_64
+#
+# Copyright (c) 2020 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+test "$UID" -ne "0" && echo "Must be run under root" && exit 0
+
+cd /usr/lib/virtualbox || exit 1
+
+mkdir -p qt || exit 2
+for i in libQt*; do
+    echo -n "Processing $i ... "
+    test -L "$i" && echo "already processed" && continue
+    mv -i "$i" qt || exit 3
+    base=`echo "$i" | sed 's/VBox//'`
+    ln -s "/usr/lib64/$base" "/usr/lib/virtualbox/$i" || exit 4
+    echo " OK"
+done
+
+test -f qt.conf && mv -i qt.conf qt
+test -d plugins && mv -i plugins qt
+
+echo
+echo "Finished"
+echo "The original VirtualBox Qt libraries are at /usr/lib/virtualbox/qt"
