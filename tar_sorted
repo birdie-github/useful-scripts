@@ -1,0 +1,37 @@
+#! /bin/sh
+
+#----------------------------------------------------------------------
+# Description: Create tar archive with files sorted by extension
+# Author:  Artem S. Tashkinov
+# Created at: Tue Jun 15 18:51:19 2010
+#             Wed Apr 23 02:53:33 2014 (--numeric-owner)
+#             Tue 10 Sep 2019 04:21:14 PM : fixed "if" - must have used "test"
+# Computer: localhost.localdomain.
+# System: Linux 2.6.33.4-ic on i686
+#
+# Copyright (c) 2010 Artem S. Tashkinov  All rights reserved.
+#----------------------------------------------------------------------
+
+[ ! -d "$1" ] && echo "Gimme an existing directory name" >&2 && exit 1
+[ -z "$2" ] && echo "Give me a destination filename" >&2 && exit 2
+[ -f "$2" ] && echo "[$2] already exists!" >&2 && exit 3
+
+[ -n "`find "$1" -iname '*|*'`" ] && echo "birdie is stupid :( " >&2 && exit 4
+
+find_files()
+{
+	STATUS=0
+	#find "$1"-type f | sed 's/^\.\///;s/\(..*\)\./\1\|/' | sort -t '|' -k2 | sed 's/|/\./'
+	# Thanks to Neil Moore aka \ametyst at irc://irc.freenode.net/bash
+	find "$1" ! -type d | sed  -e 's,\(.*\)/,\1|,' -e 's,\(.*|..*\)\.,\1|,' | sort -i -t\| -k 3,3 -k 2,2 --buffer-size=1G | sed -e 's,|,/,' -e 's,|,.,'
+	STATUS="${PIPESTATUS[0]}"
+	test "$STATUS" != "0" && return "$STATUS"
+	find "$1" -depth -type d || STATUS=1 # Saving directories timestamps, you SHOULD run tar with --no-recursion option
+	return "$STATUS"
+}
+
+filelist=`mktemp` || exit 5
+find_files "$1" > "$filelist" || exit 6
+
+tar --no-recursion --files-from="$filelist" --numeric-owner -acf "$2"
+/bin/rm "$filelist"
