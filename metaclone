@@ -1,6 +1,22 @@
 #! /bin/sh
 
-dest=/tmp/METABACKUP
+# Exit if any command fails
+set -e
+
+# 2012-10-03 05:51:23
+# a script to create a meta copy of the required directory
+
+src="$1"
+test -z "$src" -o "${src:0:1}" != "/" && echo "Usage is: `basename $0` directory_full_path" && exit
+test "$(ls "$src")" = "$(ls /)" && echo "I will not clone the root folder, sorry"  && exit
+
+test ! -d "$src" && "'$src' is not a valid directory"
+cd "$src"
+
+tempdir=$(mktemp -d)
+basedir=$(basename "$src")
+dst=$tempdir/$basedir
+mkdir "$dst"
 
 mdsync()
 {
@@ -9,27 +25,32 @@ mdsync()
 	chmod --reference="$1" "$2"
 }
 
-test -d "$dest" && echo "$dest mustn't exist" && exit
-
 echo "Creating directories ..."
-find . -depth -type d -exec mkdir -p $dest/\{\} \;
+find . -depth -type d -exec mkdir -p "$dst"/\{\} \;
 
 echo "Cloning files ..."
 find . -type f | while read filename; do
+	test -f "$dst/$filename" && echo "$dst/$filename already exists. This should have never happened. Bailing out!" && exit 100
 	fsize=`stat -c '%s' "$filename"`
 
 	if [ $fsize -gt 0 ]; then
-		fallocate -o $((fsize-1)) -l 1 "$dest/$filename" || exit
+		fallocate -o $((fsize-1)) -l 1 "$dst/$filename" || exit
 	fi
 
-	mdsync "$filename" "$dest/$filename"
+	mdsync "$filename" "$dst/$filename"
 done
 
 echo "Cloning directories dates/owners/accesses ..."
 find . -depth -type d | while read filename; do
-	mdsync "$filename" "$dest/$filename"
+	mdsync "$filename" "$dst/$filename"
 done
 
 echo "All done"
+
+cd "$tempdir"
+
+test -f "$basedir.tar" && echo "$basedir.tar already exists. This should have never happened. Bailing out!" && exit 100
+tar -Scf "$basedir.tar" "$basedir"
 echo
-echo "Run 'tar -Scf arc.tar directory' to create a proper tar archive"
+echo "The resulting file can be located at $tempdir/$basedir.tar"
+echo "$tempdir/$basedir can be safely deleted"
