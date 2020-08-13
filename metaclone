@@ -1,0 +1,35 @@
+#! /bin/sh
+
+dest=/tmp/METABACKUP
+
+mdsync()
+{
+	touch --reference="$1" "$2"
+	chown --reference="$1" "$2"
+	chmod --reference="$1" "$2"
+}
+
+test -d "$dest" && echo "$dest mustn't exist" && exit
+
+echo "Creating directories ..."
+find . -depth -type d -exec mkdir -p $dest/\{\} \;
+
+echo "Cloning files ..."
+find . -type f | while read filename; do
+	fsize=`stat -c '%s' "$filename"`
+
+	if [ $fsize -gt 0 ]; then
+		fallocate -o $((fsize-1)) -l 1 "$dest/$filename" || exit
+	fi
+
+	mdsync "$filename" "$dest/$filename"
+done
+
+echo "Cloning directories dates/owners/accesses ..."
+find . -depth -type d | while read filename; do
+	mdsync "$filename" "$dest/$filename"
+done
+
+echo "All done"
+echo
+echo "Run 'tar -Scf arc.tar directory' to create a proper tar archive"
