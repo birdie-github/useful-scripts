@@ -6,7 +6,7 @@
 # Created at: Tue Jun 15 18:51:19 2010
 #             Wed Apr 23 02:53:33 2014 (--numeric-owner)
 #             Tue 10 Sep 2019 04:21:14 PM : fixed "if" - must have used "test"
-# Computer: localhost.localdomain.
+# Computer: localhost.localdomain
 # System: Linux 2.6.33.4-ic on i686
 #
 # Copyright (c) 2010 Artem S. Tashkinov  All rights reserved.
