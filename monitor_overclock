@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Jun  2 03:00 2019
+# Jun  2 03:00 AM 2019
 
 cvt --help || exit 1
 
