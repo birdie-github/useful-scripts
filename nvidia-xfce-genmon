@@ -7,6 +7,6 @@ read temp draw fan driver pciev pciew loadgpu loadfb ramused pstate clocksgpu cl
     --query-gpu=temperature.gpu,power.draw,fan.speed,driver_version,pcie.link.gen.current,pcie.link.width.current,utilization.gpu,utilization.memory,memory.used,pstate,clocks.gr,clocks.mem,power.limit \
     --format=csv,noheader,nounits | sed 's/,//g')
 
-echo "<txt><span weight='normal' fgcolor='#FF5555'>${temp}°</span> <span weight='normal' fgcolor='#00EEEE'>$(printf "%.1f" "$draw")W</span> 🗘 ${fan}</txt>"
+echo "<txt><span weight='normal' fgcolor='#FF5555'>${temp}°</span> <span weight='normal' fgcolor='#00EEEE'>$(printf "%.1f" "$draw" 2>/dev/null)W</span> 🗘 ${fan}</txt>"
 echo -e "<tool>GPU load: $loadgpu%\nGPU: $clocksgpu MHz\nFB load: $loadfb%\nGDDR: $clocksmem MHz\nVRAM: $ramused MiB\nPerf: $pstate\nPCI-E: v${pciev} x ${pciew}\nMax: $plim W\nDriver: $driver</tool>"
 echo "<txtclick>nvidia-settings</txtclick>"
