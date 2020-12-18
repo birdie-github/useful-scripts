@@ -1,0 +1,20 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: force rescan all SCSI/SATA endpoints
+#
+# Author:  Artem S. Tashkinov <>
+# Created at: 2007-12-17 14:03:45
+#
+# Copyright (c) 2007 Artem S. Tashkinov. All rights reserved.
+#----------------------------------------------------------------------
+
+SCSI=/sys/class/scsi_host
+test ! -d "$SCSI" && echo "Error: cannot find the $SCSI directory." && exit 1
+cd "$SCSI" || exit 1
+
+for i in *; do
+	echo -n "Scanning $i ..."
+	echo "- - -" > $i/scan && echo " done."
+done
+
+echo "Finished. Consult with 'dmesg' for details."
