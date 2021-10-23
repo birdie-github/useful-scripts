@@ -3,7 +3,7 @@
 #----------------------------------------------------------------------
 # Description: watch raw input output per block device stats in real time
 # Author: Artem S. Tashkinov
-# Created at: Sat Apr  6 06:34:33 PM 2013
+# Created at: Sat Apr  6 18:34:33 2013
 # Computer: localhost.localdomain
 # System: Linux 3.8.7-ic on i686
 #
@@ -11,6 +11,9 @@
 # Sat Aug 24 19:59:32 2013 - implemented read/write interval counters
 # Sun Aug 25 23:51:14 2013 - made refreshing three times faster
 # Thu Feb  4 18:59:41 2016 - exit on pressing q/Q, read refresh rate from console
+# 2020-03-27 18:04:40 - fix finding the root in /proc/cmdline - remove an extra space, add -w instead
+#                     - sort devices numerically
+# 2021-10-23 04:51:04 - add nvme support
 #
 #----------------------------------------------------------------------
 
@@ -49,8 +52,9 @@ while :; do
 	date | tr -d '\n'
 	echo "			[ refresh rate: ${rr} seconds ]"
 	echo "Device         Read bytes       Written bytes   Interval read Interval written Mount point"
-	for i in sd* md*; do # adjust for your environment
-		for j in $i/$i* $i; do
+	for i in sd* md* nvme*; do # adjust for your environment
+#		for j in $i/$i* $i; do
+		for j in $i/$i[0-9] $i/$i[0-9][0-9] $i/$i[0-9][0-9][0-9] $i/nvme*n*p* $i; do # at most 999 partitions
 			dev=${j##*/}
 			test -z "$dev" && dev="$j" # when iterating $i itself
 
@@ -65,11 +69,11 @@ while :; do
 			test "${blkr[$dev]}" == "${intr[$dev]}" && intr[$dev]=0 # Don't show when iterating for the first time
 			test "${blkw[$dev]}" == "${intw[$dev]}" && intw[$dev]=0
 
-			printf "%-7s %'17d   %'17d  %'14d   %'14d " $dev $((blkr[$dev]*512)) $((blkw[$dev]*512)) $((intr[$dev]*512)) $((intw[$dev]*512))
+			printf "%-10s %'17d   %'17d  %'14d   %'14d " $dev $((blkr[$dev]*512)) $((blkw[$dev]*512)) $((intr[$dev]*512)) $((intw[$dev]*512))
 
 			mntp=`awk '/^\/dev\/'$dev' /{print $2}' /proc/mounts`
-			if [ -z "$mntp" ]; then
-				grep -q "root=/dev/$dev " /proc/cmdline && mntp="/"
+			if [ -z "$mntp" ]; then # FIXME: this won't work for partitons mounted via UUID/LABEL
+				grep -qw "root=/dev/$dev" /proc/cmdline && mntp="/"
 			fi
 			echo "$mntp"
 
