@@ -5,7 +5,8 @@
 # v1.4.1 Oct 26 13:20 2014: file extension normalized
 # v1.4.2 Nov 4  04:29 2014: use RAR by default, use -r- for RAR, BASH->SH
 # v1.4.3 Mar 7  22:02 2015: use UNRAR by default
-# v1.4.4 Tue 05 Nov 2019 01:18:27: prefer p7zip for zip archives
+# v1.4.4 Tue 04 Nov 2019 01:18:27: prefer p7zip for zip archives
+# v1.4.5 Fri Oct 22 2021 15:38:59: zst
 
 test -z "$1" && echo "Need an archive name to proceed" && exit 1
 test ! -e "$1" && echo "File '$1' doesn't exist" && exit 1
@@ -13,7 +14,7 @@ test ! -e "$1" && echo "File '$1' doesn't exist" && exit 1
 lower=$(echo "$1" | tr A-Z a-z)
 
 case "$lower" in
-	*.tar|*.tbz|*.txz|*.tgz|*.tar.bz2|*.tar.gz|*.tar.xz|*.tar.lz)
+	*.tar|*.tbz|*.txz|*.tgz|*.tar.bz2|*.tar.gz|*.tar.xz|*.tar.lz|*.tar.zst)
 		tar xf "$1"
 		;;
 	*.rar)
@@ -26,7 +27,7 @@ case "$lower" in
 		bzip2 -kd "$1"
 		;;
 	*.gz)
-		gunzip "$1"
+		gunzip -k "$1"
 		;;
 	*.xz)
 		xz -dk "$1"
@@ -40,6 +41,9 @@ case "$lower" in
 		;;
 	*.cpio)
 		cpio -i -m -d -F "$1"
+		;;
+	*.zst)
+		zstd -d "$1" # --keep/-k is default
 		;;
 	*)
 		echo "The archive type for '$1' is unknown"
