@@ -7,86 +7,75 @@
 # if argument2 == 1 then alert visually
 #
 # Mon Jan 11 23:11:09 2016 v1.0.1 - made `top` version agnostic
-# Wed 16 Oct 2019 09:31:20 PM - fine tune for LXDM *only*
+# Wed 16 Oct 2019 09:31:20 PM     - fine tune for LXDM *only*
 #
 # Author: Artem S. Tashkinov
 # Created at: Mon Jan 11 18:54:14 2016
 # Computer: localhost.localdomain
 # System: Linux 4.4.0-ic64 on x86_64
 #
-# Copyright (c) 2016-2019 Artem S. Tashkinov  All rights reserved.
+# Copyright (c) 2016 Artem S. Tashkinov  All rights reserved.
 #----------------------------------------------------------------------
 
 faudio=/opt/kde3/share/sounds/KDE_Beep_ClockChime.wav
-timeout=3      # visual cue for this number of seconds
-threshold=75   # minimum CPU usage which is considered bad
+timeout=3	# visual cue for this number of seconds
+threshold=75	# minimum CPU usage which is considered bad
 
 nl='
 '
 
 processes()
 {
-#    doesn't work: shows the aggregated CPU usage which might be very low for long running processes
-#    ps auxS | awk '{if ($3 > 80) for (i=11; i<=NF; i++) print $i" "}'
+#	doesn't work: shows the aggregated CPU usage which might be very low for long running processes
+#	ps auxS | awk '{if ($3 > 80) for (i=11; i<=NF; i++) print $i" "}'
 
-#    doesn't work: top version specific
-#    HOME=/dev/null top -bn1 | tail -n +8 | awk 'BEGIN{ORS=""}{if ($9 > '$threshold') {print $9"%\t"; for (i=12; i<=NF; i++) print $i" "; print "\n"}}'
+#	doesn't work: top version specific
+#	HOME=/dev/null top -bn1 | tail -n +8 | awk 'BEGIN{ORS=""}{if ($9 > '$threshold') {print $9"%\t"; for (i=12; i<=NF; i++) print $i" "; print "\n"}}'
 
-#    avoid using user's top settings
-    HOME=/dev/null top -bn1 | \
-    awk '
-    BEGIN {ORS=""}
-    {
-        if ($0~/PID.*USER.*PR/) {
-            for (i=1;i<=NF;i++) {
-                if ($i~/CPU/) f_cpu=i;
-                if ($i~/COMMAND/) f_cmd=i;
-                found=1;
-            }
-        }
-        if (found) {
-            if ($f_cpu > '$threshold') {
-                print $f_cpu"%\t";
-                for (i=f_cmd; i<=NF; i++) {
-                    if ($i != "`-") # top 3.3 likes a tree structure
-                        print $i" ";
-                }
-                print "\n";
-            }
-        }
-    }'
+#	avoid using user's top settings
+	HOME=/dev/null top -bn1 | \
+	awk '
+	BEGIN {ORS=""}
+	{
+		if ($0~/PID.*USER.*PR/) {
+			for (i=1;i<=NF;i++) {
+				if ($i~/CPU/) f_cpu=i;
+				if ($i~/COMMAND/) f_cmd=i;
+				found=1;
+			}
+		}
+		if (found) {
+			if ($f_cpu > '$threshold') {
+				print $f_cpu"%\t";
+				for (i=f_cmd; i<=NF; i++) {
+					if ($i != "`-") # top 3.3 likes a tree structure
+						print $i" ";
+				}
+				print "\n";
+			}
+		}
+	}'
 }
 
-if [ "$1" = 1 ]; then 
-    if [ -n "`processes`" ]; then
-        if [ -f "$faudio" ]; then
-            aplay -q "$faudio" &
-        elif eplay --version &>/dev/null; then
-            play -q -n synth 0.5 sine &
-        else
-            echo -ne '\007' &
-        fi
-    fi
+if [ "$1" = 1 ]; then
+	if [ -n "`processes`" ]; then
+		if [ -f "$faudio" ]; then
+			aplay -q "$faudio" &
+		elif eplay --version &>/dev/null; then
+			play -q -n synth 0.5 sine &
+		else
+			echo -ne '\007' &
+		fi
+	fi
 fi
 
-# LXDM version
 pid_lxdm=`pidof lxdm-session`
 Xuser=0 # this might not work - needs to be tested
 test -z "$pid_lxdm" || Xuser=`ps -u --ppid "$pid_lxdm" | tail -1 | awk '{print $1}'`
 
 if [ "$2" = 1 -a -n "$Xuser" ]; then
-    bad_processes=`processes`
-    if [ -n "$bad_processes" ]; then
-        su "$Xuser" -c "DISPLAY=:0 xmessage -center -timeout $timeout 'Detected > ${threshold}%:$nl$bad_processes' &> /dev/null" &
-    fi
+	bad_processes=`processes`
+	if [ -n "$bad_processes" ]; then
+		su "$Xuser" -c "DISPLAY=:0 notify-send --expire-time="${timeout}000" --icon=/mnt/STORAGE/birdie/linux/new/Adwaita_32x32_dialog-warning.png 'Warning!' 'Detected > ${threshold}%:$nl$bad_processes' &> /dev/null" &
+	fi
 fi
-
-# Universal version in case w does work (it doesn't for LXDM)
-#if [ "$2" = 1 ]; then
-#    w | awk '/xdm/{print $1" "$2}' | while read current_user current_x; do
-#        bad_processes=`processes`
-#        if [ -n "$bad_processes" ]; then
-#            su $current_user -c "DISPLAY=$current_x xmessage -center -timeout $timeout 'Detected > ${threshold}%:$nl$bad_processes' &> /dev/null" &
-#        fi
-#    done
-#fi
