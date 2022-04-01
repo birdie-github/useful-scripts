@@ -1,0 +1,24 @@
+#! /bin/bash
+
+# 2022-04-01 11:44:22 UTC
+# Load the TCP module to allow other local users to use audio devices
+# Change the default sampling rate to 48KHz
+# Enable more allowed sampling rates
+
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PulseAudio#module-native-protocol-tcp
+# "auth-ip-acl=127.0.0.1;192.168.1.0/24;::1" https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/847#note_828707
+# "listen=127.0.0.1;192.168.0.100;::1"       https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/2259
+
+if [ -z "`pactl list modules | grep module-native-protocol-tcp`" ]; then
+    echo -n "Loading module-native-protocol-tcp ... "
+    pactl load-module module-native-protocol-tcp listen=127.0.0.1
+else
+    echo "module-native-protocol-tcp is already loaded"
+fi
+
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PipeWire
+# Get settings: `pw-metadata -n settings`
+
+echo "Setting extra options ... "
+pw-metadata -n settings 0 clock.rate 48000
+pw-metadata -n settings 0 clock.allowed-rates '[ 48000, 96000, 44100 ]'
