@@ -33,7 +33,11 @@
 #  1.2.5 add boost support
 #        truncate the resulting frequencies
 #
-# Copyright (c) 2005-2019 Artem S. Tashkinov. All rights reserved.
+# Wed Mar 23 09:35:13 PM 2022
+#  1.2.6 add schedutil governor support
+#        show the CPU frequency driver
+#
+# Copyright (c) 2005-2022 Artem S. Tashkinov. All rights reserved.
 #----------------------------------------------------------------------
 
 #set -x
@@ -60,12 +64,12 @@ setgov()
 {
 	echo "$1" | tee $SG > /dev/null
 	test -n "`cat $SG | grep -v "$1"`" && echo "Failed setting $1 governor!" && exit 100
-	echo "$1 mode has been activated"
+	echo "$1 mode/governor has been activated"
 }
 
 getgov()
 {
-	echo "`cat $SG | sort | uniq` mode is currently activated."
+	echo "Governor: `cat $SG | sort | uniq`"
 }
 
 boost()
@@ -154,10 +158,11 @@ case $1 in
 		echo "	-a --auto		- ondemand mode (rapid auto performance)"
 		echo "	-b --boost		- enable/disable boost"
 		echo "	-c --conservative	- conservative mode (gradual auto performance)"
+		echo "	-s --schedutil		- schedutil governor"
 		echo "	-u --userspace FREQ	- user defined CPU frequency"
 		echo "	-l --load		- load CPU powersave driver"
 		echo "	-n --now		- show current mode"
-		echo "	-s --set FREQ		- set maximum CPU frequency"
+		echo "	-S --set FREQ		- set maximum CPU frequency"
 		echo "	-r --reset		- reset maximum CPU frequency"
 		echo "	-f --frequencies	- show available frequencies"
 		echo "	-v --version		- show application version and exit"
@@ -181,6 +186,10 @@ case $1 in
 		setgov conservative
 		exit;;
 
+	--schedutil|-s)
+		setgov schedutil
+		exit;;
+
 	--minimum|-m)
 		setgov powersave
 		exit;;
@@ -189,7 +198,7 @@ case $1 in
 		setgov performance
 		exit;;
 
-	--set|-s)
+	--set|-S)
 		setspeed maxfreq "$2"
 		exit;;
 
@@ -214,6 +223,7 @@ case $1 in
 		exit;;
 
 	--now|-n|*)
+		echo "Driver: `cat $cpu0/scaling_driver`"
 		boost
 		getgov
 		for i in `cat $lead/cpu*/cpufreq/scaling_cur_freq`; do
