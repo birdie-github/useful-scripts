@@ -8,16 +8,29 @@
 # https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PulseAudio#module-native-protocol-tcp
 # "auth-ip-acl=127.0.0.1;192.168.1.0/24;::1" https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/847#note_828707
 # "listen=127.0.0.1;192.168.0.100;::1"       https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/2259
+#
+# 2022-04-04 11:44:29 UTC
+# + module-x11-bell : /usr/share/sounds/freedesktop/stereo/bell.oga in sound-theme-freedesktop
 
-if [ -z "`pactl list modules | grep module-native-protocol-tcp`" ]; then
-    echo -n "Loading module-native-protocol-tcp ... "
-    pactl load-module module-native-protocol-tcp listen=127.0.0.1
-else
-    echo "module-native-protocol-tcp is already loaded"
-fi
+declare -A opts
+opts[module-native-protocol-tcp]="listen=127.0.0.1"
+
+for i in module-native-protocol-tcp module-x11-bell; do 
+    if [ -z "`pactl list modules | grep $i`" ]; then
+        echo -n "Loading $i ... "
+        pactl load-module $i ${opts[$i]} && echo OK
+    else
+        echo "$i is already loaded"
+    fi
+done
 
 # https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PipeWire
 # Get settings: `pw-metadata -n settings`
+
+if ! which pw-metadata &> /dev/null; then
+    echo "Error: 'pw-metadata' is missing, please install pipewire-utils"
+    exit 1
+fi
 
 echo "Setting extra options ... "
 pw-metadata -n settings 0 clock.rate 48000
