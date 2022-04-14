@@ -37,19 +37,21 @@
 #  1.2.6 add schedutil governor support
 #        show the CPU frequency driver
 #
+# Tue Apr  5 06:18:12 AM 2022
+#  1.2.7 fix setting [max] CPU frequency with amd-pstate
+#
 # Copyright (c) 2005-2022 Artem S. Tashkinov. All rights reserved.
 #----------------------------------------------------------------------
 
-#set -x
-
-version=1.2.4
+version=1.2.7
 DRIVER=acpi_cpufreq
 lead=/sys/devices/system/cpu
 
 cpu0=$lead/cpu0/cpufreq
 max0=`cat $cpu0/cpuinfo_max_freq 2>/dev/null`
 lim0=`cat $cpu0/scaling_max_freq 2>/dev/null`
-boost=/sys/devices/system/cpu/cpufreq/boost
+fboost=/sys/devices/system/cpu/cpufreq/boost
+favailfreq=$cpu0/scaling_available_frequencies
 SG=$lead/cpu*/cpufreq/scaling_governor
 SD=$cpu0/scaling_driver
 
@@ -74,32 +76,32 @@ getgov()
 
 boost()
 {
-	test ! -f "$boost" && echo "Boost is not supported" && return
+	test ! -f "$fboost" && echo "Boost is not supported" && return
 	echo -n "Boost: "
 	if [ -z "$1" ]; then
-		test "`cat $boost`" == "1" && echo "on" || echo "off"
+		test "`cat $fboost`" == "1" && echo "on" || echo "off"
 	else
 		arg=`echo "$1" | tr A-Z a-z`
 		if [ "$arg" == "1" -o "$arg" == "on" -o "$arg" == "yes" ]; then
-			echo "1" > $boost
-			test "`cat $boost`" == "1" && echo "enabled"  || echo "FAILED to enable"
+			echo "1" > $fboost
+			test "`cat $fboost`" == "1" && echo "enabled"  || echo "FAILED to enable"
 		else
-			echo "0" > $boost
-			test "`cat $boost`" == "0" && echo "disabled" || echo "FAILED to disable"
+			echo "0" > $fboost
+			test "`cat $fboost`" == "0" && echo "disabled" || echo "FAILED to disable"
 		fi
 	fi
 }
 
 setspeed()
 {
-	allowed=`cat $cpu0/scaling_available_frequencies`
+	allowed=`cat $favailfreq 2>/dev/null`
 	if [ -z "$2" ]; then
 		echo "Need an argument to continue."
 		echo "The possible frequences are: $allowed"
 		return 1
 	fi
 
-	if [ -z "`echo "$allowed" | grep -w "$2"`" ]; then
+	if [ -z "`echo "$allowed" | grep -w "$2"`" -a -f $favailfreq ]; then
 		echo "'$2' is not amongst the allowed frequencies: "
 		echo $allowed
 		return 2
@@ -110,12 +112,12 @@ setspeed()
 		echo -n "Setting user defined frequency of `echo $2 | hz2mhz` ... "
 		echo "$2" | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
 		echo "$2" | tee $lead/cpu*/cpufreq/scaling_setspeed > /dev/null
-		[ "`cat $cpu0/scaling_cur_freq 2>/dev/null`" == "$2" ] && echo OK || echo Failed
+		[ "`cat $cpu0/scaling_setspeed 2>/dev/null`" == "$2" ] && echo OK || echo Failed
 	elif [ "$1" == "maxfreq" ]; then
 		getgov
-		echo "Setting maximum frequency of `echo $2 | hz2mhz` ... "
+		echo "Setting maximum frequency of `echo $2 | hz2mhz`"
 		echo "$2" | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
-		cat $lead/cpu*/cpufreq/scaling_max_freq
+		echo "Result: $(cat $lead/cpu*/cpufreq/scaling_max_freq | awk '{print $1/1000"MHz"}' | uniq)"
 	else
 		echo "Don't know what to do"
 	fi
@@ -219,7 +221,7 @@ case $1 in
 
 	--frequencies|-f)
 		echo -n "The available frequencies are: "
-		cat $cpu0/scaling_available_frequencies
+		cat $favailfreq
 		exit;;
 
 	--now|-n|*)
