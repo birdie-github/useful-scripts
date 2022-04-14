@@ -42,3 +42,7 @@ find .  -xdev -type f | while read filename; do filefrag "$filename" | egrep -v 
 
 # dmesg show only serious messages without timestamps
 dmesg -t --level=alert,crit,err,warn
+
+# Build VirtualBox/NVIDIA modules with a custom kernel version
+KERN_VER=$VERSION make -j16 # VirtualBox
+SYSSRC=/lib/modules/$VERSION/source make -j16 # NVIDIA
