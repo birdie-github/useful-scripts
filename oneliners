@@ -7,6 +7,9 @@ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq | awk '{if (max<$0) ma
 # mmt4 + 1.5GB dictionary requires 32GB of free(!) RAM
 7za a -mx=9 -myx=9 -mfb=273 -bt -slp -mmt4 -md=1536m -mqs archive_name.7z [files or/and directories]
 
+# Maximum 7zz compression - requires a ton of RAM - 44GB maybe
+7zz a -mx=9 -myx=9 -mfb=273 -bt -slp -mmt2 -md=3840m -mqs -stl -snl archive_name.7z [files or/and directories]
+
 # Compute md5sum for all the files and subdirectoties' files in the current directory
 find . -type f -print0 | xargs -0 [nocache] md5sum > output-file.md5
 
@@ -33,3 +36,6 @@ nvidia-smi --query-gpu=temperature.gpu,power.draw --format=csv,noheader,nounits
 
 # Compile VMWare kernel modules, 2009-08-30 05:35:03
 vmware-modconfig --console --install-all
+
+# online ext4 defrag for the current directory and all subdirs - no idea when I wrote it, around 2017 maybe?
+find .  -xdev -type f | while read filename; do filefrag "$filename" | egrep -v ": 1 extent|: 0 extents"; done | while read line; do fname=`echo "$line" | awk -F ': ' '{print $1}'`; e4defrag -v "$fname"; done
