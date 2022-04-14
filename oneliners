@@ -39,3 +39,6 @@ vmware-modconfig --console --install-all
 
 # online ext4 defrag for the current directory and all subdirs - no idea when I wrote it, around 2017 maybe?
 find .  -xdev -type f | while read filename; do filefrag "$filename" | egrep -v ": 1 extent|: 0 extents"; done | while read line; do fname=`echo "$line" | awk -F ': ' '{print $1}'`; e4defrag -v "$fname"; done
+
+# dmesg show only serious messages without timestamps
+dmesg -t --level=alert,crit,err,warn
