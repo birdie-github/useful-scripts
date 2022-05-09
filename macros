@@ -1,0 +1,11 @@
+# 2021-05-17 17:07:50
+# this is for RPM/dnf updates - don't update installed files which match the appropriate files from new packages
+%_minimize_writes 1
+
+# 2021-12-14 15:47:01 https://bugzilla.redhat.com/show_bug.cgi?id=2032066
+# Locales to install
+%_install_langs C:en:en_US:en_US.UTF-8:ru_RU:ru_RU.UTF-8
+
+# 2022-05-08 14:28:22
+# Do not install /usr/share/doc documents
+%_excludedocs 1
