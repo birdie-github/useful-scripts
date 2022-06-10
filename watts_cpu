@@ -20,3 +20,5 @@ test -n "$1" && interval=$1
 test "$TERM" = "dumb" && echo -n " ⚙️"
 turbostat --quiet --num_iterations 1 --interval "$interval" --show PkgWatt --Summary | tail -1 | tr -d '\n'
 echo -n "W"
+
+#sensors amdgpu-pci-0900 2>/dev/null | awk '/power/{print " 📀" int($2) "W"}'
