@@ -1,0 +1,36 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: fast defrag files in the specified directory for ext4
+# Author: Artem S. Tashkinov
+# Created at: Fri Jun 10 10:11:00 2022
+# System: Linux 5.18.3-az3 on x86_64
+#
+# Copyright (c) 2022 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+# Initially used this but it takes forever to complete:
+#
+# find .  -xdev -type f | while read filename; do filefrag "$filename" | egrep -v ": 1 extent|: 0 extents"; done | while read line; do fname=`echo "$line" | awk -F ': ' '{print $1}'`; e4defrag -v "$fname" | grep -v "e4defrag 1"; done
+#
+# -P $(nproc) below could be too much or too little for your system - adjust accordingly
+
+isfragged()
+{
+    for i in "$@"; do
+        filefrag "$i" | egrep -v ": 1 extent|: 0 extents"
+    done
+}
+
+if [ "$1" = "isfragged" ]; then
+    shift
+    isfragged "$@"
+    exit 0
+fi
+
+test "$UID" -ne "0" && echo "Must be run under root" && exit 0
+
+test ! -d "$1" && echo "Need a valid directory to continue" && exit 1
+cd "$1" || exit 2
+echo "Defragging [$1] ..."
+find .  -xdev -type f -print0 | xargs -r -0 -P $(nproc) defrag isfragged | while read line; do fname=`echo "$line" | awk -F ': ' '{print $1}'`; e4defrag -v "$fname" | grep -v "e4defrag 1"; done
