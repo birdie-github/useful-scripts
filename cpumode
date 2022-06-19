@@ -40,14 +40,18 @@
 # Tue Apr  5 06:18:12 AM 2022
 #  1.2.7 fix setting [max] CPU frequency with amd-pstate
 #
+# Fri Jun 17 01:04:33 PM 2022
+#  1.2.8 multiple fixes for intel-pstate
+#
 # Copyright (c) 2005-2022 Artem S. Tashkinov. All rights reserved.
 #----------------------------------------------------------------------
 
-version=1.2.7
+version=1.2.8
 DRIVER=acpi_cpufreq
 lead=/sys/devices/system/cpu
 
 cpu0=$lead/cpu0/cpufreq
+min0=`cat $cpu0/cpuinfo_min_freq 2>/dev/null`
 max0=`cat $cpu0/cpuinfo_max_freq 2>/dev/null`
 lim0=`cat $cpu0/scaling_max_freq 2>/dev/null`
 fboost=/sys/devices/system/cpu/cpufreq/boost
@@ -64,8 +68,8 @@ hz2mhz() # only ONE argument at a time!
 
 setgov()
 {
-	echo "$1" | tee $SG > /dev/null
-	test -n "`cat $SG | grep -v "$1"`" && echo "Failed setting $1 governor!" && exit 100
+	echo "$1" | tee $SG &> /dev/null
+	test -n "`cat $SG | grep -v "$1"`" && echo "Failed swithing to the '$1' governor! Might not be supported or compiled in." && exit 100
 	echo "$1 mode/governor has been activated"
 }
 
@@ -92,12 +96,22 @@ boost()
 	fi
 }
 
+availfreq()
+{
+	echo -n "The available frequencies are: "
+	if [ -f "$favailfreq" ]; then
+		cat "$favailfreq"
+	else
+		echo "anything from $(hz2mhz $min0) ($min0 KHz) to $(hz2mhz $max0)($max0 KHz)"
+	fi
+}
+
 setspeed()
 {
 	allowed=`cat $favailfreq 2>/dev/null`
 	if [ -z "$2" ]; then
-		echo "Need an argument to continue."
-		echo "The possible frequences are: $allowed"
+		echo -n "Need an argument to continue. "
+		availfreq
 		return 1
 	fi
 
@@ -133,15 +147,16 @@ governors=`cat $cpu0/scaling_available_governors 2>&1`
 for i in performance conservative userspace powersave ondemand; do
 	cgovern=`echo $governors | grep $i`
 	if [ -z "$cgovern" ]; then
-		echo "CPU governor '$i' not found."
+		echo "CPU governor '$i' is not present"
 		module="cpufreq_$i"
-		echo "Installing $module ... "
+		#echo "Installing $module ... " # intel_pstate doesn't work with conservative userspace ondemand - no idea why - let's silence everything
 		modprobe $module >/dev/null 2>&1
 		if [ "$?" != "0" ]; then
 			echo "Error: can't load $module module. Do you have it installed?"
 			exit 1
 		else
-			echo "OK"
+			#echo "OK"
+			:
 		fi
 	fi
 done
@@ -220,8 +235,7 @@ case $1 in
 		exit;;
 
 	--frequencies|-f)
-		echo -n "The available frequencies are: "
-		cat $favailfreq
+		availfreq
 		exit;;
 
 	--now|-n|*)
