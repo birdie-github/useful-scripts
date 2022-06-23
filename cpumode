@@ -43,10 +43,16 @@
 # Fri Jun 17 01:04:33 PM 2022
 #  1.2.8 multiple fixes for intel-pstate
 #
+# Thu Jun 23 07:38:05 AM 2022
+#  1.2.9 multiple optimizations and fixes for intel-pstate boost
+#
 # Copyright (c) 2005-2022 Artem S. Tashkinov. All rights reserved.
 #----------------------------------------------------------------------
 
-version=1.2.8
+#set -x
+#PS4='+ $(date "+%s.%N ($LINENO) ")'
+
+version=1.2.9
 DRIVER=acpi_cpufreq
 lead=/sys/devices/system/cpu
 
@@ -54,16 +60,14 @@ cpu0=$lead/cpu0/cpufreq
 min0=`cat $cpu0/cpuinfo_min_freq 2>/dev/null`
 max0=`cat $cpu0/cpuinfo_max_freq 2>/dev/null`
 lim0=`cat $cpu0/scaling_max_freq 2>/dev/null`
-fboost=/sys/devices/system/cpu/cpufreq/boost
 favailfreq=$cpu0/scaling_available_frequencies
 SG=$lead/cpu*/cpufreq/scaling_governor
 SD=$cpu0/scaling_driver
 
-hz2mhz() # only ONE argument at a time!
+hz2mhz()
 {
-	freq="$1"
-	test -z "$freq" && read freq
-	awk 'END{print int('$freq'/1000)"MHz"}' < /dev/null
+:
+	echo "$@" | awk 'END{ORS=" "; for (i=1;i<=NF;i++) print int($i/1000)"MHz"}' | sed 's/.$//'
 }
 
 setgov()
@@ -80,18 +84,23 @@ getgov()
 
 boost()
 {
-	test ! -f "$fboost" && echo "Boost is not supported" && return
-	echo -n "Boost: "
+	on=1
+	off=0
+	fboost=/sys/devices/system/cpu/cpufreq/boost
+	test "$SD" = "intel-pstate" && fboost=/sys/devices/system/cpu/intel_pstate/no_turbo && on=0 && off=1
+
+	echo -n "Boost:    "
+	test ! -f "$fboost" && echo "is not supported" && return
 	if [ -z "$1" ]; then
-		test "`cat $fboost`" == "1" && echo "on" || echo "off"
+		test "`cat $fboost`" == "$on" && echo "enabled" || echo "disabled"
 	else
 		arg=`echo "$1" | tr A-Z a-z`
 		if [ "$arg" == "1" -o "$arg" == "on" -o "$arg" == "yes" ]; then
-			echo "1" > $fboost
-			test "`cat $fboost`" == "1" && echo "enabled"  || echo "FAILED to enable"
+			echo "$on" > $fboost
+			test "`cat $fboost`" == "$on" && echo "enabled"  || echo "FAILED to enable"
 		else
-			echo "0" > $fboost
-			test "`cat $fboost`" == "0" && echo "disabled" || echo "FAILED to disable"
+			echo "$off" > $fboost
+			test "`cat $fboost`" == "$off" && echo "disabled" || echo "FAILED to disable"
 		fi
 	fi
 }
@@ -123,13 +132,13 @@ setspeed()
 
 	if [ "$1" == "userspace" ]; then
 		setgov userspace
-		echo -n "Setting user defined frequency of `echo $2 | hz2mhz` ... "
+		echo -n "Setting user defined frequency of `hz2mhz $2` ... "
 		echo "$2" | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
 		echo "$2" | tee $lead/cpu*/cpufreq/scaling_setspeed > /dev/null
 		[ "`cat $cpu0/scaling_setspeed 2>/dev/null`" == "$2" ] && echo OK || echo Failed
 	elif [ "$1" == "maxfreq" ]; then
 		getgov
-		echo "Setting maximum frequency of `echo $2 | hz2mhz`"
+		echo "Setting maximum frequency of `hz2mhz $2`"
 		echo "$2" | tee $lead/cpu*/cpufreq/scaling_max_freq > /dev/null
 		echo "Result: $(cat $lead/cpu*/cpufreq/scaling_max_freq | awk '{print $1/1000"MHz"}' | uniq)"
 	else
@@ -182,6 +191,7 @@ case $1 in
 		echo "	-S --set FREQ		- set maximum CPU frequency"
 		echo "	-r --reset		- reset maximum CPU frequency"
 		echo "	-f --frequencies	- show available frequencies"
+		echo "	-t --time		- percentage of time spent in states"
 		echo "	-v --version		- show application version and exit"
 		echo "	-h --help		- show this help and exit"
 		exit 0;;
@@ -238,13 +248,31 @@ case $1 in
 		availfreq
 		exit;;
 
+	--time|-t)
+		if [ -f /sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state ]; then
+			awk '{time[$1]+=$2;sum+=$2}END{for (var in time) print var,":",time[var]/sum*100,"%"}' /sys/devices/system/cpu/cpufreq/policy*/stats/time_in_state
+		else
+			echo "time_in_state is not supported"
+		fi
+		exit;;
+
 	--now|-n|*)
-		echo "Driver: `cat $cpu0/scaling_driver`"
+		echo "Driver:   `cat $cpu0/scaling_driver`"
 		boost
 		getgov
-		for i in `cat $lead/cpu*/cpufreq/scaling_cur_freq`; do
-			hz2mhz "$i"
-		done
+
+		cores=`cat $lead/cpu*/cpufreq/scaling_cur_freq 2>/dev/null`
+		if [ -n "$cores" ]; then
+			echo -n "Average and maximum frequencies now: "
+			hz2mhz `echo $cores | awk 'BEGIN{max=0;avr=0} {for (i=1;i<=NF;i++) {if ($i>max) max=$i; avr+=$i}} END{print avr/NF, max}'`
+			echo
+
+			#echo -n "Cores are at: " # no one cares considering there are PCs with 32 virtual cores
+			#hz2mhz $cores
+			#echo
+		else
+			echo "This should have never happened!"
+		fi
 
 		# Check if maximum CPU frequences are mixed or maxed out
 		for i in `cat $lead/cpu*/cpufreq/scaling_max_freq`; do
@@ -264,7 +292,7 @@ case $1 in
 					hz2mhz "$i"
 				done
 			else
-				echo "Maximum allowed frequency is `echo $lim0 | hz2mhz` (out of `echo $max0 | hz2mhz`)"
+				echo "Maximum allowed frequency is `hz2mhz $lim0` (out of `hz2mhz $max0`)"
 			fi
 		fi
 
