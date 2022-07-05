@@ -62,7 +62,7 @@ max0=`cat $cpu0/cpuinfo_max_freq 2>/dev/null`
 lim0=`cat $cpu0/scaling_max_freq 2>/dev/null`
 favailfreq=$cpu0/scaling_available_frequencies
 SG=$lead/cpu*/cpufreq/scaling_governor
-SD=$cpu0/scaling_driver
+SD=`cat $cpu0/scaling_driver 2>/dev/null`
 
 hz2mhz()
 {
@@ -87,7 +87,7 @@ boost()
 	on=1
 	off=0
 	fboost=/sys/devices/system/cpu/cpufreq/boost
-	test "$SD" = "intel-pstate" && fboost=/sys/devices/system/cpu/intel_pstate/no_turbo && on=0 && off=1
+	test "$SD" = "intel_pstate" && fboost=/sys/devices/system/cpu/intel_pstate/no_turbo && on=0 && off=1
 
 	echo -n "Boost:    "
 	test ! -f "$fboost" && echo "is not supported" && return
@@ -146,7 +146,7 @@ setspeed()
 	fi
 }
 
-if [ ! -f $SD -a "$1" != "-l" -a "$1" != "--load" ]; then
+if [ ! -n "$SD" -a "$1" != "-l" -a "$1" != "--load" ]; then
 	echo "Error: cpufrequency subsystem is not running!"
 	exit 1
 fi
@@ -156,9 +156,9 @@ governors=`cat $cpu0/scaling_available_governors 2>&1`
 for i in performance conservative userspace powersave ondemand; do
 	cgovern=`echo $governors | grep $i`
 	if [ -z "$cgovern" ]; then
-		echo "CPU governor '$i' is not present"
+		#echo "CPU governor '$i' is not present" # intel_pstate doesn't work with conservative userspace ondemand - no idea why - let's silence everything
 		module="cpufreq_$i"
-		#echo "Installing $module ... " # intel_pstate doesn't work with conservative userspace ondemand - no idea why - let's silence everything
+		#echo "Installing $module ... " # likewise
 		modprobe $module >/dev/null 2>&1
 		if [ "$?" != "0" ]; then
 			echo "Error: can't load $module module. Do you have it installed?"
@@ -257,7 +257,7 @@ case $1 in
 		exit;;
 
 	--now|-n|*)
-		echo "Driver:   `cat $cpu0/scaling_driver`"
+		echo "Driver:   $SD"
 		boost
 		getgov
 

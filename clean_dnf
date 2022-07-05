@@ -2,15 +2,15 @@
 #----------------------------------------------------------------------
 # Description: script for rpm uninstallation within all installed rpms
 #
-# Author:  Artem S. Tashkinov
+# Author:  Artem S. Tashkinov <birdie@permonline.ru>
 # Created at:
-#             Mon Nov 21 20:12:04 +05 2016 - dnf, show deps, no clear
-#             Wed Dec 13 19:43:00 +05 2017 - remove by mask, skip already deleted, skip protected
-#             Fri May 11 18:52:51 +05 2018 - skip packages with errors instead of waithing for the user input
+#             Mon Nov 21 20:12:04 2016 - dnf, show deps, no clear
+#             Wed Dec 13 19:43:00 2017 - remove by mask, skip already deleted, skip protected
+#             Fri May 11 18:52:51 2018 - skip packages with errors instead of waithing for the user input
 #                                            stop background dependancy checking
 #                                            set env var SKIP to skip up to a certain package
 #
-# Copyright (c) 2018 Artem S. Tashkinov. All rights reserved.
+# Copyright (c) 2004 Artem S. Tashkinov. All rights reserved.
 #----------------------------------------------------------------------
 
 #set -x
