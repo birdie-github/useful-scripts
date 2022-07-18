@@ -7,6 +7,7 @@
 #             Thu Jan 31 15:40:07 2019 exclude tun when looking for a defgw
 #             2019-08-27 14:15:16 - no idea what it was
 #             Wed 16 Oct 2019 08:58:46 PM - beautify IP using printf
+#             2022-07-18 16:37:59 - print debug only in the interactive console
 #
 # Computer: localhost.localdomain
 # System: Linux 4.14.10-ic64 on x86_64
@@ -14,20 +15,25 @@
 # Copyright (c) 2018 Artem S. Tashkinov  All rights reserved.
 #----------------------------------------------------------------------
 
-default=( "irc.freenode.net" "en.wikipedia.org" "distrowatch.com" "wiki.debian.org" )
+eko()
+{
+    test "$TERM" = "linux" -o "$TERM" = "xterm-256color" && echo "$@"
+}
+
+default=( "irc.freenode.net" "en.wikipedia.org" "distrowatch.com" "wiki.debian.org" "irc.gnome.org" )
 (( $# == 0 )) && set -- "${default[@]}" # Set arguments to $default if no command line arguments are given
 defgw=`ip r | grep -v tun | awk '/default via/{print $3}'`
-test -z "$defgw" && echo "Default gateway is not defined" && exit 1
-echo "Default gateway is $defgw"
+test -z "$defgw" && eko "Default gateway is not defined" && exit 1
+eko "Default gateway is $defgw"
 
 for i in "$@"; do
-    echo "Routing $i ... "
-    for IP in `host "$i" | awk '/has address/{print $4}'`; do
-        printf "  %-14s : " "$IP"
-        if [ -z "`ip r | grep -w "$IP"`" ]; then
-            ip r a "$IP/32" via "$defgw" && echo "OK" || echo "failed"
-        else
-            echo "already routed"
-        fi
-    done
+	eko "Routing $i ... "
+	for IP in `host "$i" | awk '/has address/{print $4}'`; do
+		printf "  %-14s : " "$IP"
+		if [ -z "`ip r | grep -w "$IP"`" ]; then
+			ip r a "$IP/32" via "$defgw" && eko "OK" || eko "failed"
+		else
+			eko "already routed"
+		fi
+	done
 done
