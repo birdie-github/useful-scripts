@@ -8,4 +8,6 @@
 
 # 2022-05-08 14:28:22
 # Do not install /usr/share/doc documents
-%_excludedocs 1
+# 2022-05-10 22:05:13 - this also prevents man pages from being installed :(
+# Instead use dnf install [packages] --setopt=install_weak_deps=False --setopt='tsflags=nodocs'
+# %_excludedocs 1
