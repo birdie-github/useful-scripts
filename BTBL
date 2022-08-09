@@ -1,0 +1,27 @@
+#! /bin/bash
+
+# bluetooth battery level
+# 2022-06-28 01:27:46 - fixes
+# 2022-08-01 23:12:38 - show emoji
+
+dev=headset_dev_XX_XX_XX_XX_XX_XX # find it via upower -d
+test -n "$1" && dev="$1"
+getdata=`upower --show-info "/org/freedesktop/UPower/devices/$dev"`
+test -n "`echo "$getdata" | grep '(null)'`" && echo "⊝" && exit
+level=`echo "$getdata" | awk '/percentage/{print $2}' | sed 's/%//'`
+
+# check if it's a valid number
+case "$level" in
+    ''|*[!0-9]*) exit 1;;
+esac
+
+# only show emoji for a graphical session
+if [ "$TERM" = "dumb" ]; then
+    if [ "$level" -gt 39 ]; then # adjust to your situation: below 40% is already too low/little for me
+        echo -n " 🔋"
+    else
+        echo -n " 🪫"
+   fi
+fi
+
+echo "${level}%"
