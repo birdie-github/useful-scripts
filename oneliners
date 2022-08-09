@@ -47,3 +47,28 @@ dmesg -t --level=alert,crit,err,warn
 # Build VirtualBox/NVIDIA modules with a custom kernel version
 KERN_VER=$VERSION make -j16 # VirtualBox
 SYSSRC=/lib/modules/$VERSION/source make -j16 # NVIDIA
+
+# Not one-liners
+# image2vvc - convert a bmp image to VVC  somewhat losslessly (rgb to yuv420p10le is not lossless), 2021-04-27 19:39:38
+for i in "$@"; do
+    xy=`identify "$i" | sed 's/.* \([0-9]*x[0-9]*\).*/\1/'` # ([[:digit:]]{1,5}x[[:digit:]]{1,5})
+    base="${i%.*}"
+    test -f "$base.vvc" && echo "Found $base.vvc, skipping" && continue
+    echo "File: $i Dimensions: $xy"
+    ffmpeg -hide_banner -loglevel error -nostats -s "$xy" -i "$i" -vframes 1 -pix_fmt yuv420p10le "$base.yuv"
+    # ffmpeg -s "$xy" -pix_fmt yuv420p10le -i "$base.yuv" -vframes 1 "$base.bmp"
+    # --verbosity 5
+    nice -20 ./vvencapp --input "$base.yuv" --size "$xy" --format yuv420_10 --frames 1 --preset slower --qp 0 --output "$base.vvc"
+    rm "$base.yuv"
+    touch -r "$i" "$base.vvc"
+done
+
+# vvc2bmp - decompress VVC to bmp, 2021-04-27 20:21:06
+for i in "$@"; do
+    base="${i%.*}"
+    test -f "$base.bmp" && echo "Found $base.bmp, skipping" && continue
+    res=`./vvdecapp --bitstream "$i" --output "$base.yuv" | awk '/SizeInfo:/{print $4}'`
+    echo "File: $i Dimensions: $res"
+    ffmpeg -hide_banner -loglevel error -nostats -pix_fmt yuv420p10le -s "$res" -i "$base.yuv" "$base.bmp"
+    rm "$base.yuv"
+done
