@@ -76,3 +76,6 @@ done
 # get current date/time in a sane format, e.g. 
 LANG=en_DK.UTF-8 date +"%x %X"
 2022-08-09 02:54:42
+
+# Set git repo files modification dates/times to the time they were commited (stolen somewhere - don't remember where)
+git ls-tree -r --name-only HEAD | while read filename; do unixtime=$(git log -1 --format="%at" -- "${filename}"); touchtime=$(date -d @$unixtime +'%Y%m%d%H%M.%S'); touch -t ${touchtime} "${filename}"; done
