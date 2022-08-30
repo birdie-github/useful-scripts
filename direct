@@ -1,5 +1,8 @@
 #! /bin/bash
 
+# This is for VPN users: oftentimes you need to access certain websites directly while bypassing VPN and you don't want to disable it.
+# This script allows you to run any application, so that it talked to the Internet from your primary interface, not your VPN interface.
+
 # 2022-08-23 15:20:09
 # Bloody tired of Google who hates VPN
 
