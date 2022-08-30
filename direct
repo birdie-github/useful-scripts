@@ -1,0 +1,32 @@
+#! /bin/bash
+
+# 2022-08-23 15:20:09
+# Bloody tired of Google who hates VPN
+
+ifdirect=`ip -br link show | awk '/^en/{print $1}'`
+ipdirect=`ip -4 -br addr show dev "$ifdirect" | awk '{print $3}' | awk -F '/' '{print $1}'`
+
+echo "Using IP adress $ipdirect ..."
+test -z "$1" && echo "Need a command to run :-)" && exit 1
+BIND_ADDR="$ipdirect" LD_PRELOAD="/usr/local/lib/bind.so /usr/local/lib64/bind.so" "$@"
+
+# This requires some preparation
+
+# 1. For rc.local
+## v2 working 2020-11-24 15:34:04
+#direct2()
+#{
+#    grep -q "200 direct" /etc/iproute2/rt_tables || echo -e "\n# `date`\n200 direct" >> /etc/iproute2/rt_tables
+#    ifdirect=`ip l | grep " en" | awk -F : '{print $2}' | sed 's/ //'`
+#    if [ -n "$ifdirect" ]; then
+#        ip rule add from 192.168.0.1/24 table direct prio 1
+#        ip route add default via 192.168.0.1 dev "$ifdirect" table direct
+#    fi
+#}
+
+# 2. For /etc/iproute2/rt_tables
+## Tue Nov 24 03:24:42 PM 2020
+# 200 direct
+
+# 3. And lastly
+# https://github.com/Intika-Linux-Firewall/Bind-Interface-IP
