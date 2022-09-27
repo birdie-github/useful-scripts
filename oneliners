@@ -79,3 +79,9 @@ LANG=en_DK.UTF-8 date +"%x %X"
 
 # Set git repo files modification dates/times to the time they were commited (stolen somewhere - don't remember where)
 git ls-tree -r --name-only HEAD | while read filename; do unixtime=$(git log -1 --format="%at" -- "${filename}"); touchtime=$(date -d @$unixtime +'%Y%m%d%H%M.%S'); touch -t ${touchtime} "${filename}"; done
+
+# What I run daily after the Sun sets:
+xcalib -v -blue 0.9 0 90 -alter
+
+# This is to cancel it
+xcalib -c
