@@ -5,17 +5,21 @@
 #              Wed Jan 23 00:25:46 2019 : on/off argument
 # Author: Artem S. Tashkinov
 # Created at: Sun Jan 20 18:26:25 2019
+#             2019-01-23 00:31:42 changes unknown
+#             2022-10-21 01:54:22 fixes for new xinput output
 # Computer: localhost.localdomain
 # System: Linux 4.19.15-300.fc29.x86_64 on x86_64
 #
-# Copyright (c) 2019 Artem S. Tashkinov  All rights reserved.
+# Copyright (c) 2019-2022 Artem S. Tashkinov  All rights reserved.
 #
 #----------------------------------------------------------------------
 
 test -z "$DISPLAY" && echo "DISPLAY is not set. Exiting" && exit -1
 
-mouse=`xinput list | grep Mouse | sed 's/.*id=\(.\).*/\1/'`
-current=`xinput --list-props "$mouse" | grep -i "Accel Profile Enabled (303)" | rev | cut -c -4 | rev` # alternatively tail -c 5
+# sed 's/.*id=\(.\).*/\1/'` - this should have never worked
+mouse=`xinput list | grep Mouse | grep -v Keyboard | sed 's/.*id=\([0-9]*\).*/\1/'`
+# was "Accel Profile Enabled (303)" - now 304, why? Let's remove the number
+current=`xinput --list-props "$mouse" | grep -i "Accel Profile Enabled (" | rev | cut -c -4 | rev` # alternatively tail -c 5
 
 w=`echo "$1" | tr '[:upper:]' '[:lower:]'`
 
