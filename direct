@@ -2,16 +2,21 @@
 
 # This is for VPN users: oftentimes you need to access certain websites directly while bypassing VPN and you don't want to disable it.
 # This script allows you to run any application, so that it talked to the Internet from your primary interface, not your VPN interface.
-
-# 2022-08-23 15:20:09
-# Bloody tired of Google who hates VPN
+# This requires https://github.com/Intika-Linux-Firewall/Bind-Interface-IP
+# Compile both for the i686 and x86-64 architectures and this script will work for an application regardless of its bitness
+#
+# 2022-08-23 15:20:09 bloody tired of Google who hates VPN
+# 2022-11-07 20:39:28 add `exec` to avoid an extra hanging bash process
+# 2022-12-22 10:47:51 UTC updated description
 
 ifdirect=`ip -br link show | awk '/^en/{print $1}'`
 ipdirect=`ip -4 -br addr show dev "$ifdirect" | awk '{print $3}' | awk -F '/' '{print $1}'`
 
 echo "Using IP adress $ipdirect ..."
 test -z "$1" && echo "Need a command to run :-)" && exit 1
-BIND_ADDR="$ipdirect" LD_PRELOAD="/usr/local/lib/bind.so /usr/local/lib64/bind.so" "$@"
+export BIND_ADDR="$ipdirect"
+export LD_PRELOAD="/usr/local/lib/bind.so /usr/local/lib64/bind.so"
+exec "$@"
 
 # This requires some preparation
 
