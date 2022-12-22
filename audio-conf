@@ -11,11 +11,14 @@
 #
 # 2022-04-04 11:44:29 UTC
 # + module-x11-bell : /usr/share/sounds/freedesktop/stereo/bell.oga in sound-theme-freedesktop
+# 2022-12-22 10:27:26 UTC
+# + module-combine-sink : output to all enabled devices simultaneously (that's an output virtual "combined" device)
 
 declare -A opts
 opts[module-native-protocol-tcp]="listen=127.0.0.1"
+opts[module-combine-sink]="sink_name=CombinedVirtual"
 
-for i in module-native-protocol-tcp module-x11-bell; do 
+for i in module-native-protocol-tcp module-x11-bell module-combine-sink; do
     if [ -z "`pactl list modules | grep $i`" ]; then
         echo -n "Loading $i ... "
         pactl load-module $i ${opts[$i]} && echo OK
