@@ -3,6 +3,7 @@
 # Description: fast defrag files in the specified directory for ext4
 # Author: Artem S. Tashkinov
 # Created at: Fri Jun 10 10:11:00 2022
+#             2023-04-22 13:45:01 egrep: warning: egrep is obsolescent; using grep -E
 # System: Linux 5.18.3-az3 on x86_64
 #
 # Copyright (c) 2022 Artem S. Tashkinov  All rights reserved.
@@ -18,7 +19,7 @@
 isfragged()
 {
     for i in "$@"; do
-        filefrag "$i" | egrep -v ": 1 extent|: 0 extents"
+        filefrag "$i" | grep -E -v ": 1 extent|: 0 extents"
     done
 }
 
