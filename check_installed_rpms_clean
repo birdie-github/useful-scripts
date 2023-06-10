@@ -1,0 +1,45 @@
+#! /bin/bash
+
+# 2019-02-23 15:59:17 - clean version
+# 2023-05-03 12:48:05 - egrep -> grep -E
+
+echo "Running ... "
+
+[ -n "$1" ] && nodeps="|Unsatisfied dependencies|is needed by"
+
+logf=/tmp/RPM-V.$RANDOM$RANDOM
+> $logf
+
+r[0]='-'
+r[1]='\'
+r[2]='|'
+r[3]='/'
+r[4]='-'
+r[5]='\'
+r[6]='|'
+r[7]='/'
+
+j=0
+n=1
+
+total=`rpm -qa | wc -l`
+
+for i in `rpm -qa | sort`; do
+
+	p=$((n*100/total))
+	echo -en "\r${r[$j]} $n [$p%]"
+	RES=`nice -20 rpm -V "$i" | grep -E -v "ZZZXXXCCC$nodeps"`
+
+	if [ -n "$RES" ]; then
+		echo " ******************** $i ******************** " >> $logf
+		echo "$RES" >> $logf
+	fi
+
+	n=$((n+1))
+	j=$((j+1))
+	test $j -gt 7 && j=0
+
+done
+
+echo
+echo "Done. $n packages verified. See log here: $logf"
