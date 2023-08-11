@@ -6,8 +6,9 @@
 # Created at: 2019-09-04 14:17:52
 #             2020-05-17 21:55:38 - output GPU wattage as well
 #             2022-04-14 09:24:31 - disable GPU wattage, don't show emoji for console
+#             2023-08-10 14:17:38 - adjust for updated AMD GPU sensors output
 #
-# Copyright (c) 2019-2022 Artem S. Tashkinov  All rights reserved.
+# Copyright (c) 2019-2023 Artem S. Tashkinov  All rights reserved.
 #
 #----------------------------------------------------------------------
 
@@ -17,8 +18,12 @@ test ! -r /dev/cpu/0/msr && echo "No permissions to read MSR. Exiting" && exit 2
 interval=1
 test -n "$1" && interval=$1
 # only show emoji for a graphical session
-test "$TERM" = "dumb" && echo -n " ⚙️"
+ECPU="CPU "
+EGPU="GPU "
+test "$TERM" = "dumb" && ECPU="⚙️" && EGPU="🕹️"
+echo -n " $ECPU"
 turbostat --quiet --num_iterations 1 --interval "$interval" --show PkgWatt --Summary | tail -1 | tr -d '\n'
 echo -n "W"
 
-#sensors amdgpu-pci-0900 2>/dev/null | awk '/power/{print " 📀" int($2) "W"}'
+echo -n " $EGPU"
+sensors 'amdgpu-pci-*' 2>/dev/null | awk '/power|PPT/{print $2 "W"}'
