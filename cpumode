@@ -66,7 +66,6 @@ SD=`cat $cpu0/scaling_driver 2>/dev/null`
 
 hz2mhz()
 {
-:
 	echo "$@" | awk 'END{ORS=" "; for (i=1;i<=NF;i++) print int($i/1000)"MHz"}' | sed 's/.$//'
 }
 
@@ -288,9 +287,8 @@ case $1 in
 		else
 			if [ -n "$nonuni" ]; then
 				echo "Maximum CPU frequency per CPU is :"
-				for i in `cat $lead/cpu*/cpufreq/scaling_max_freq`; do
-					hz2mhz "$i"
-				done
+				hz2mhz `cat $lead/cpu*/cpufreq/scaling_max_freq`
+				echo
 			else
 				echo "Maximum allowed frequency is `hz2mhz $lim0` (out of `hz2mhz $max0`)"
 			fi
