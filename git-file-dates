@@ -1,0 +1,30 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: set git repository files modification dates to the date
+#              they were pushed
+# Author: Artem S. Tashkinov
+# Created at: Tue Sep 26 14:28:52 2023
+# Computer: zen
+# System: Linux 6.5.5-zen3 on x86_64
+#
+# Copyright (c) 2023 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+# otherwise bash under xargs won't find the function
+set -o allexport
+
+filesetdate()
+{
+    unixtime=$(git log -1 --format="%at" -- "$1")
+    touchtime=$(date -d @$unixtime +'%Y%m%d%H%M.%S')
+    touch -t ${touchtime} "$1"
+}
+
+echo "Processing '$(pwd)' ..."
+# Let's hope there are no files/directories with newlines in their names
+git ls-tree -r --name-only HEAD | xargs -e -I {} -P $(nproc) bash -c 'filesetdate "{}"'
+echo "Done."
+
+# Or use parallel if it works (it may not if there are too many files)
+# parallel --keep-order --no-run-if-empty --null filesetdate "{}"
