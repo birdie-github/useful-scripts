@@ -1,8 +1,9 @@
 #! /bin/bash
 
 if jq --version &>/dev/null; then
-    # https://www.coingecko.com/en/widgets/coin_ticker_widget
-    price1=`curl --silent --max-time 7 https://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
+    # https://www.coindesk.com/price/bitcoin/
+    # | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
+    price1=`curl --silent --max-time 7 'https://production.api.coindesk.com/v2/tb/price/ticker?assets=all' 2>/dev/null | jq .data.BTC.ohlc.c`
 
     # https://coinmarketcap.com/widget/ broken as of 2020-10-19
     # price2=`curl --silent --max-time 7 'https://widgets.coinmarketcap.com/v2/ticker/1/?ref=widget&convert=USD' 2>/dev/null | jq '.data.quotes.USD.price | tonumber'`
