@@ -29,3 +29,7 @@ Monitor input/output read/write nicely formatted stats for all block devices/dis
 ## Bottom line
 
 To be honest I have close to a hundred such scripts but many of them are either silly or useful only for me. I publish them elsewhere.
+
+## SAST Tools
+
+[PVS-Studio](https://pvs-studio.com/pvs-studio/?utm_source=website&utm_medium=github&utm_campaign=open_source) - static analyzer for C, C++, C#, and Java code.
