@@ -1,0 +1,27 @@
+#! /bin/bash
+
+#----------------------------------------------------------------------
+# Description: create single-file par2 recovery record for each specified file
+# Author: Artem S. Tashkinov
+# Created at: Sat Jun 30 02:02:38 2018
+# Computer: localhost.localdomain
+# System: Linux 4.17.2-ic64 on x86_64
+#
+# Copyright (c) 2018 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+for i in "$@"; do
+	echo "Processing $i ... "
+	test -s "$i.rec.tar" && echo "  PAR2 record already exists. Skipping" && continue
+	echo -n "  Creating PAR2 record ... "
+	par2create -q -q -n1 -r1 "$i" && echo "OK" || exit 1
+	echo -n "  Verifying PAR2 record ... "
+	par2verify -q -q "$i" && echo "OK" || exit 2
+	md5sum "$i" "$i.par2" "$i.vol00+20.par2" > "$i.par2.md5" || exit 3
+	touch -r "$i" "$i.par2" "$i.vol00+20.par2" "$i.par2.md5" || exit 4
+	tar -cf "$i.rec.tar" "$i.par2" "$i.vol00+20.par2" "$i.par2.md5" || exit 5
+	touch -r "$i" "$i.rec.tar" || exit 6
+	/bin/rm "$i.par2" "$i.vol00+20.par2" "$i.par2.md5" || exit 7
+	echo "Done"
+done
