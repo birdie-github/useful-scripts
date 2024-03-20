@@ -10,6 +10,7 @@
 # 2023-11-29 09:53:29 - remove --power-saving, it breaks the CPU up on resume
 # 2023-12-29 22:25:19 - restore --power-saving, firmware is broken regardless
 # 2024-02-11 18:00:14 - since 6.7 /sys/class/graphics/fb0 is missing, adjusting accordingly
+# 2024-03-18 01:10:36 - drop wattage limits, temperature is enough
 delay=60
 
 binary=/usr/local/bin/ryzenadj
@@ -31,13 +32,17 @@ conf()
 {
     if [ -z "$1" ]; then
         echo "Mains settings:"
-        $binary --tctl-temp=75 --power-saving --stapm-limit=30000 --fast-limit=30000 --slow-limit=20000 2>&1 | grep -v SMU
+        $binary --tctl-temp=80 --power-saving 2>&1 | grep -v SMU
         gpupower auto
-    else # with any second argument, i.e. "battery"
+    elif [ "$1" = "battery" ]; then
         echo "Battery settings:"
         $binary --tctl-temp=70 --power-saving --stapm-limit=15000 --fast-limit=15000 --slow-limit=10000 2>&1 | grep -v SMU
         echo "Enabling GPU low power, this limits RAM speed!"
         gpupower low
+    elif [ "$1" = "fast" ]; then
+        echo "Fast and hot settings:"
+        $binary --tctl-temp=85 2>&1 | grep -v SMU
+        gpupower auto
     fi
 
     true
