@@ -2,7 +2,7 @@
 #----------------------------------------------------------------------
 # Description: script for rpm uninstallation within all installed rpms
 #
-# Author:  Artem S. Tashkinov <birdie@permonline.ru>
+# Author:  Artem S. Tashkinov
 # Created at:
 #             Mon Nov 21 20:12:04 2016 - dnf, show deps, no clear
 #             Wed Dec 13 19:43:00 2017 - remove by mask, skip already deleted, skip protected
