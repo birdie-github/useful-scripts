@@ -90,3 +90,7 @@ xcalib -c
 # 2024-01-01 16:17:36 UTC
 alsa-lib annobin-docs annobin-plugin-gcc atk atk-devel bison cups-devel exo flac-devel fontconfig freeglut-devel freetype-devel gcc gdk-pixbuf2 gdk-pixbuf2-devel git git-core-doc glib2 glibc gnutls gnutls-devel goldendict lame-libs lcms2-devel libaom-devel libcurl libcurl-devel libgpg-error libicu-devel libidn2 libtiff libtiff-devel libtool libvpx-devel libxml2 libxml2-devel libxslt-devel libxslt-devel.i686 libxslt-devel.x86_64 mpfr mpg123-devel ncurses nettle-devel nspr nss openssl-devel opus-devel pango-devel pcre2-devel pcre-devel pipewire pulseaudio-libs-devel source-highlight Thunar valgrind xfce4-panel xfce4-settings xfce4-terminal xfce4-weather-plugin xfdesktop zlib-devel
 eatmydata dnf update --setopt='tsflags=nodocs' `cat ~/NODOCS`
+
+# Elite laptop
+# 2023-12-15 00:08:08
+# libaom-devel alsa-lib-devel annobin-docs bind-libs bison cups-devel curl expat fftw-libs-single flac-devel fontconfig freetype-devel gcc gdk-pixbuf2 gdk-pixbuf2-devel git git-core-doc glib2 glibc gnutls gnutls-devel gparted hwloc-libs krb5-devel lame-libs libcurl libgpg-error libtiff-devel libtool libtraceevent libxml2 libxslt libxslt-devel libXt libXt-devel luajit mpg123-devel ncurses nettle-devel nspr nss openssl opus-devel pcre2-devel pcre-devel pulseaudio-libs-devel ristretto SDL2 source-highlight Thunar xfce4-panel xfce4-settings xfce4-terminal xfdesktop zlib-devel
