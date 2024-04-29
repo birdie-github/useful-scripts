@@ -88,7 +88,7 @@ xcalib -c
 
 # Main PC Fedora 38 nodocs packages (too fat)
 # 2024-01-01 16:17:36 UTC
-alsa-lib annobin-docs annobin-plugin-gcc atk atk-devel bison cups-devel exo flac-devel fontconfig freeglut-devel freetype-devel gcc gdk-pixbuf2 gdk-pixbuf2-devel git git-core-doc glib2 glibc gnutls gnutls-devel goldendict lame-libs lcms2-devel libaom-devel libcurl libcurl-devel libgpg-error libicu-devel libidn2 libtiff libtiff-devel libtool libvpx-devel libxml2 libxml2-devel libxslt-devel libxslt-devel.i686 libxslt-devel.x86_64 mpfr mpg123-devel ncurses nettle-devel nspr nss openssl-devel opus-devel pango-devel pcre2-devel pcre-devel pipewire pulseaudio-libs-devel source-highlight Thunar valgrind xfce4-panel xfce4-settings xfce4-terminal xfce4-weather-plugin xfdesktop zlib-devel
+# alsa-lib annobin-docs annobin-plugin-gcc atk atk-devel bison cups-devel exo flac-devel fontconfig freeglut-devel freetype-devel gcc gdk-pixbuf2 gdk-pixbuf2-devel git git-core-doc glib2 glibc gnutls gnutls-devel goldendict lame-libs lcms2-devel libaom-devel libcurl libcurl-devel libgpg-error libicu-devel libidn2 libtiff libtiff-devel libtool libvpx-devel libxml2 libxml2-devel libxslt-devel libxslt-devel.i686 libxslt-devel.x86_64 mpfr mpg123-devel ncurses nettle-devel nspr nss openssl-devel opus-devel pango-devel pcre2-devel pcre-devel pipewire pulseaudio-libs-devel source-highlight Thunar valgrind xfce4-panel xfce4-settings xfce4-terminal xfce4-weather-plugin xfdesktop zlib-devel
 eatmydata dnf update --setopt='tsflags=nodocs' `cat ~/NODOCS`
 
 # Elite laptop
