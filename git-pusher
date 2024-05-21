@@ -1,0 +1,29 @@
+#! /bin/bash
+
+# A quickly hacked script to push files to GIT/github while preserving their original modification dates as git commits' dates
+# No licence. If you're gonna steal it, please retain this header, thanks!
+# Set debug to echo if you don't want to screw up everything
+# © 2024-05-21 12:58:00 UTC Artem S. Tashkinov
+#
+# Instructions
+# git init
+# git remote add origin git@github.com:user/repo.git
+#
+# Use it this way for all files at once:
+#     find . -type f  -not -path "*git*" -print0 | xargs -0 git-pusher
+#
+# or for individual files
+#     git-pusher path/file
+
+set -x
+debug=echo
+
+for i in "$@"; do
+    name=`echo "$i" | sed 's/\.\///'` # strip ./ from `find` output
+    mtime=$(stat -c "%y" "$i")
+    export GIT_AUTHOR_DATE="$mtime"
+    export GIT_COMMITTER_DATE="$mtime"
+    $debug git add "$name"
+    $debug git commit -am "$name" # this sucks
+    $debug git push --set-upstream origin master
+done
