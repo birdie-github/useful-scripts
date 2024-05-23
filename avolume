@@ -1,0 +1,13 @@
+#! /bin/bash
+
+# 2021-04-27 13:44:02
+amount=3
+test -n "$3" && amount="$3"
+
+volume=`audtool get-volume` || exit 1
+
+if [ "$1" = "+" ]; then
+    audtool set-volume $((volume+amount))
+else
+    audtool set-volume $((volume-amount))
+fi
