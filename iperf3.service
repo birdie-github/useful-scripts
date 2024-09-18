@@ -1,0 +1,35 @@
+[Unit]
+Description=iperf3 server for network throughput measurement that uses port 5201 by default
+
+After=basic.target network.target network-online.target
+Before=sshd.service
+Wants=basic.target network-online.target
+
+[Service]
+ExecStart=/usr/bin/iperf3 --server
+SyslogIdentifier=iperf3
+#CapabilityBoundingSet=CAP_IPC_LOCK CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SETGID CAP_SETUID CAP_SETPCAP CAP_SYS_CHROOT CAP_DAC_OVERRIDE CAP_AUDIT_WRITE
+#CapabilityBoundingSet=CAP_NET_ADMIN
+RestrictNamespaces=yes
+ProtectClock=true
+ProtectSystem=strict
+ProtectHostname=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+NoNewPrivileges=yes
+PrivateTmp=yes
+UMask=0077
+RestrictAddressFamilies=AF_NETLINK AF_INET AF_INET6
+DeviceAllow=/dev/null rw
+PrivateTmp=true
+ProtectSystem=true
+ProtectHome=true
+DynamicUser=true
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
