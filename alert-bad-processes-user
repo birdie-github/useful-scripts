@@ -3,24 +3,26 @@
 #----------------------------------------------------------------------
 # Description: alert audibly and visually if there are CPU heavy
 #              processes running
-# if argument1 == 1 then alert audibly
-# if argument2 == 1 then alert visually
+# if argument1 is set then alert audibly
 #
-# Mon Jan 11 23:11:09 2016 v1.0.1 - made `top` version agnostic
-# Wed 16 Oct 2019 09:31:20 PM - fine tune for LXDM *only*
+# 2026-01-11 23:11:09 v1.0.1 - made `top` version agnostic
+# 2019-10-16 21:31:20 fine tune for LXDM *only*
+# 2025-01-02 05:25:38 turned it into a user script to be run from ~/.config/autostart; fixed top's no config invocation (no option yet, filed a bug report)
+# 2025-01-03 05:25:38 now uses a standard audio file
 #
 # Author: Artem S. Tashkinov
 # Created at: Mon Jan 11 18:54:14 2016
 # Computer: localhost.localdomain
 # System: Linux 4.4.0-ic64 on x86_64
 #
-# Copyright (c) 2016 Artem S. Tashkinov  All rights reserved.
+# Copyright (c) 2016-2025 Artem S. Tashkinov  All rights reserved.
 #----------------------------------------------------------------------
 
-faudio=/opt/kde3/share/sounds/KDE_Beep_ClockChime.wav
+faudio=/usr/share/sounds/freedesktop/stereo/complete.oga
 timeout=3	# visual cue for this number of seconds
 threshold=60	# minimum CPU usage which is considered bad
-interval=60
+volume=33	# audio notification volume
+interval=5	# check for bad processes every X seconds
 
 nl='
 '
@@ -65,12 +67,8 @@ while :; do
 
 		notify-send --expire-time="${timeout}000" --icon=/mnt/STORAGE/birdie/linux/new/Adwaita_32x32_dialog-warning.png "Warning!" "Detected > ${threshold}%:$nl$bad_processes" &> /dev/null &
 
-		if [ -f "$faudio" ]; then
-			aplay -q "$faudio" &
-		elif eplay --version &>/dev/null; then
-			play -q -n synth 0.5 sine &
-		else
-			echo -ne '\007' &
+		if [ -f "$faudio" -a -n "$1" ]; then
+			paplay --volume=$((volume*65535/100)) "$faudio" &
 		fi
 
 	fi
