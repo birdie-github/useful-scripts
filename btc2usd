@@ -1,17 +1,19 @@
 #! /bin/bash
 
+# 2025-01-16 20:45:26 reordered, a hint for the XFCE command output applet
+
 if jq --version &>/dev/null; then
-    # https://www.coindesk.com/price/bitcoin/
-    # | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
-    price1=`curl --silent --max-time 7 'https://production.api.coindesk.com/v2/tb/price/ticker?assets=all' 2>/dev/null | jq .data.BTC.ohlc.c`
 
-    # https://coinmarketcap.com/widget/ broken as of 2020-10-19
-    # price2=`curl --silent --max-time 7 'https://widgets.coinmarketcap.com/v2/ticker/1/?ref=widget&convert=USD' 2>/dev/null | jq '.data.quotes.USD.price | tonumber'`
+    price1=`curl --silent --max-time 7 https://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
 
-    # https://www.coingecko.com/en/widgets/coin_ticker_widget
     price3=`curl --silent --max-time 7 'https://api.coingecko.com/api/v3/coins/bitcoin?developer_data=false&community_data=false&tickers=false' | jq '.market_data.current_price.usd'`
 
-    printf " %'.f %'.f " "$price1" "$price3" 2>/dev/null
+    printf "<txt> %'.f %'.f </txt>" "$price3" "$price1" 2>/dev/null
+    echo "<tool>1st: coingecko.com; 2nd: coindesk.com;</tool>"
+    echo "<txtclick>firefox https://coingecko.com</txtclick>"
+
 else
+
     echo "Install jq"
+
 fi
