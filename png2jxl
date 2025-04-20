@@ -1,0 +1,29 @@
+#! /bin/bash
+#----------------------------------------------------------------------
+# Description: convert all PNG files in the current directory
+#              to JXL/JPEG XL while preserving timestamps
+#
+# Author: Artem S. Tashkinov
+# Created at: Wed Apr 16 13:26:42 2025
+# Computer: zen
+# System: Linux 6.13.8-zen3 on x86_64
+#
+# Copyright (c) 2025 Artem S. Tashkinov  All rights reserved.
+#
+#----------------------------------------------------------------------
+
+#cjxl only supports PNG
+#for i in *.bmp *.png *.webp *.gif; do
+#   output="${i%.*}.jxl"
+#   operation "$i" "$output"
+#done
+
+# Let's speed it up and nice it to infinity
+encode() {
+  input="$1"
+  output="${input%.*}.jxl"
+  nice -20 cjxl -q 100 --allow_expert_options -e 11 -v -v "$input" "$output" && touch -r "$input" "$output"
+}
+
+export -f encode
+parallel --keep-order --jobs 4 --halt now,fail=1 --color-failed --bar encode ::: *.png
