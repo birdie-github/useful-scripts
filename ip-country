@@ -1,10 +1,46 @@
 #! /bin/bash
 
-if jq --version &>/dev/null; then
-    data=`curl --silent --max-time 3 https://ipapi.co/json/ 2>/dev/null`
+# Show country code and IP address
+# 2018-04-25 12:37:31 - first release
+# 2024-08-31 20:17:00 - show real IP address as a tooltip (took 40 minutes to debug, getting old and stupid)
+# 2024-09-03 04:43:27 - i'm getting old and stupid
+# 2025-02-27 20:45:08 - ignore tun0's DOWN state
+
+fetcher()
+{
+    # 🎭 👓
+    test "$1" = "hasvpn" && note="🌍 " || note=""
+    cleanup="cat"
+
+    if [ "$1" = "direct" ]; then
+        direct=direct
+        cleanup="tail -n +2"
+    fi
+    data=`$direct curl --silent --max-time 10 https://ipapi.co/json/ 2>/dev/null | $cleanup`
     IP=`echo "$data" | jq .ip`
     country=`echo "$data" | jq .country`
-    echo -n "$country:$IP" | sed 's/"//g'
+    echo -n "$note$country:$IP" | sed 's/"//g'
+}
+
+tooltip()
+{
+    echo "<tool>$*</tool>"
+}
+
+if jq --version &>/dev/null; then
+    if [ -n "`ip l show tun0 2>/dev/null | grep DEFAULT | grep -v DOWN`" ]; then
+        echo -n "<txt>"
+        fetcher hasvpn
+        echo "</txt>"
+        tooltip `fetcher direct`
+    else
+        echo -n "<txt>"
+        fetcher
+        echo "</txt>"
+        tooltip "Not using VPN"
+    fi
 else
     echo "Install jq"
 fi
+
+echo "<txtclick>firefox https://myip.com</txtclick>"
