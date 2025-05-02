@@ -8,7 +8,8 @@
 # Created at: Wed Dec 20 13:50 2017
 #             2019-05-29 15:08:05 Firefox 68 fix
 #             2022-12-17 01:47:32 Firefox 108 fix
-#             2025-04-09 14:34:47 Firefox 137 fix
+#             2025-04-09 14:34:47 Firefox 137 fix for the locale variable
+#             2025-05-01 21:45:14 Firefox 138 fix for the updater tool
 # Computer: localhost.localdomain
 # System: Linux 4.14.3-300.fc27.x86_64 on x86_64
 #
@@ -140,7 +141,11 @@ if ! fetch "$url_incr"; then
 fi
 
 echo "Applying update ..."
-LD_LIBRARY_PATH="$2" "$2/updater" "$workdir" "$2" "$2"
+if [ $norm_vershave -lt 138000000 ]; then
+    LD_LIBRARY_PATH="$2" "$2/updater" "$workdir" "$2" "$2"
+else
+    LD_LIBRARY_PATH="$2" "$2/updater" 3 "$workdir" "$2" "$2" first 0
+fi
 
 echo -n "Cleaning up ... "
 rm -rf "$workdir" && echo OK
