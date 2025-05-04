@@ -1,15 +1,16 @@
 #! /bin/bash
 
+# 2020-10-19 19:29:08
 # 2025-01-16 20:45:26 reordered, a hint for the XFCE command output applet
+# 2025-04-28 14:32:28 coindesk can go fuck themselves
 
 if jq --version &>/dev/null; then
 
-    price1=`curl --silent --max-time 7 https://api.coindesk.com/v1/bpi/currentprice.json 2>/dev/null | jq .bpi.USD.rate | sed 's/,//g;s/"//g'` # due to a number format: 8,255.3913
-
+    price1=`curl --silent --max-time 7 'https://data-api.cryptocompare.com/asset/v1/top/list?page=1&page_size=15&sort_by=CIRCULATING_MKT_CAP_USD&sort_direction=DESC&groups=ID%2CBASIC%2CSUPPLY%2CPRICE%2CMKT_CAP%2CVOLUME%2CCHANGE%2CTOPLIST_RANK&toplist_quote_asset=USD&response_format=JSON' | jq '.Data.LIST[] | select(.SYMBOL == "BTC") | .PRICE_USD'`
     price3=`curl --silent --max-time 7 'https://api.coingecko.com/api/v3/coins/bitcoin?developer_data=false&community_data=false&tickers=false' | jq '.market_data.current_price.usd'`
 
     printf "<txt> %'.f %'.f </txt>" "$price3" "$price1" 2>/dev/null
-    echo "<tool>1st: coingecko.com; 2nd: coindesk.com;</tool>"
+    echo "<tool>1st: coingecko.com; 2nd: coindesk.com via cryptocompare;</tool>"
     echo "<txtclick>firefox https://coingecko.com</txtclick>"
 
 else
