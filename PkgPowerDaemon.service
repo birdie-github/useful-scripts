@@ -1,0 +1,23 @@
+[Unit]
+Description=PkgPowerDaemon - a daemon to log CPU Package Power to a world readable file
+After=basic.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/PkgPowerDaemon.sh
+Restart=always
+RestartSec=1
+
+# Auto-create /run/cpu with correct perms
+RuntimeDirectory=cpu
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/cpu/
+
+[Install]
+# Start the service before we get to multi-user mode
+WantedBy=multi-user.target
