@@ -1,0 +1,57 @@
+#! /bin/bash
+
+# Date:  2026-02-10 14:43
+# Fixes: 2026-03-09 15:38 - limit the number of work threads for large images; support effort
+# Fixes: 2026-06-13 16:39 - support tga, webp and bmp via gm convert
+
+max_threads=`nproc` || exit 1
+
+e=${EFFORT:-11}
+
+if ! [[ "$e" =~ ^[0-9]+$ ]]; then
+    echo "Invalid EFFORT '$e'; expected integer" >&2
+    exit 1
+fi
+
+echo "Using effort $e. Use EFFORT=N `basename "$0"` to override"
+
+for i in "$@"; do
+    src=$i
+    threads=$max_threads
+    # https://stackoverflow.com/questions/12152626/how-can-i-remove-the-extension-of-a-filename-in-a-shell-script
+
+    dir=$(dirname -- "$i")
+    base=$(basename -- "$i")
+    out="$dir/${base%.*}"
+    ext="${i##*.}"
+
+    test -f "$out.jxl" && echo "$out.jxl already exists, skipping" && continue
+
+    read -r x y < <(gm identify -format "%w %h" "$i") || {
+        echo "Failed to identify image dimensions. Bailing out!" >&2
+        exit 1
+    }
+
+    if (( e >= 11 && x * y > 4194304 )); then
+        threads=4
+    fi
+
+    echo "-------- Processing $i (${x}x${y}) using $threads threads --------"
+
+    cleanup=0
+    if [[ "${ext,,}" == "tga" || "${ext,,}" == "webp" || "${ext,,}" == "bmp" ]]; then
+        cleanup=1
+        inter=$(mktemp --suffix=.png)
+        gm convert "$src" "$inter" && src="$inter" || exit 1
+    fi
+
+    if /bin/time nice -20 cjxl -q 100 -e "$e" --allow_expert_options --num_threads "$threads" -v -- "$src" "$out.jxl"; then
+        touch -r "$i" "$out.jxl"
+        test "$cleanup" -eq 1 && rm "$inter"
+        echo "Done"
+    else
+        echo "cjxl failed! bailing out."
+        test "$cleanup" -eq 1 && rm "$inter"
+        exit 1
+    fi
+done
