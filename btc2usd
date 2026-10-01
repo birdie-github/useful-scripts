@@ -1,20 +1,46 @@
 #! /bin/bash
-
 # 2020-10-19 19:29:08
 # 2025-01-16 20:45:26 reordered, a hint for the XFCE command output applet
 # 2025-04-28 14:32:28 coindesk can go fuck themselves
+# 2026-08-25 17:54:43 coindesk must fuck itself
+# 2026-09-20 17:31:29 coindesk please fuck yourself
 
-if jq --version &>/dev/null; then
+set -x
 
-    price1=`curl --silent --max-time 7 'https://data-api.cryptocompare.com/asset/v1/top/list?page=1&page_size=15&sort_by=CIRCULATING_MKT_CAP_USD&sort_direction=DESC&groups=ID%2CBASIC%2CSUPPLY%2CPRICE%2CMKT_CAP%2CVOLUME%2CCHANGE%2CTOPLIST_RANK&toplist_quote_asset=USD&response_format=JSON' | jq '.Data.LIST[] | select(.SYMBOL == "BTC") | .PRICE_USD'`
-    price3=`curl --silent --max-time 7 'https://api.coingecko.com/api/v3/coins/bitcoin?developer_data=false&community_data=false&tickers=false' | jq '.market_data.current_price.usd'`
+if ! jq --version &>/dev/null; then
+    echo "Install jq"
+    exit 1
+fi
 
-    printf "<txt> %'.f %'.f </txt>" "$price3" "$price1" 2>/dev/null
-    echo "<tool>1st: coingecko.com; 2nd: coindesk.com via cryptocompare;</tool>"
-    echo "<txtclick>firefox https://coingecko.com</txtclick>"
+tooltip()
+{
+    echo -n "1st: coingecko.com; 2nd: binance" #coindesk.com via Google Finance BETA;"
+}
+
+rawdata()
+{
+    #`curl --silent --max-time 7 'https://data-api.cryptocompare.com/asset/v1/top/list?page=1&page_size=15&sort_by=CIRCULATING_MKT_CAP_USD&sort_direction=DESC&groups=ID%2CBASIC%2CSUPPLY%2CPRICE%2CMKT_CAP%2CVOLUME%2CCHANGE%2CTOPLIST_RANK&toplist_quote_asset=USD&response_format=JSON' | jq '.Data.LIST[] | select(.SYMBOL == "BTC") | .PRICE_USD'`
+    #`wget -O - -q --timeout=7 'https://www.google.com/finance/beta/quote/CDIXBX:INDEXNYSEGIS' | sed -n 's/.*"INDEXNYSEGIS"],"CoinDesk Bitcoin Price Index",1,null,\[\([^,]*\).*/\1/p' | cut -d. -f1`
+
+    price1=`curl --silent --max-time 7 'https://api.coingecko.com/api/v3/coins/bitcoin?developer_data=false&community_data=false&tickers=false' | jq '.market_data.current_price.usd'`
+    price2=`curl -s "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT" | jq -r '.price | tonumber | floor'`
+    printf "%'.f %'.f" "$price1" "$price2" 2>/dev/null
+}
+
+if [ "$XDG_CURRENT_DESKTOP" = "wayfire" ]; then
+
+    case "$1" in
+        tooltip)
+            tooltip
+            ;;
+
+        *)
+            rawdata
+            ;;
+    esac
 
 else
-
-    echo "Install jq"
-
+    echo "<txt> "`rawdata`" </txt>"
+    echo "<tool>"`tooltip`"</tool>"
+    echo "<txtclick>firefox https://coingecko.com</txtclick>"
 fi
