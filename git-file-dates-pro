@@ -1,0 +1,310 @@
+#!/usr/bin/bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023-2026 Artem S. Tashkinov
+
+set -euo pipefail
+
+readonly PROGRAM=${0##*/}
+readonly VERSION='1.1.1'
+readonly DEFAULT_MAX_JOBS=8
+
+usage() {
+    cat <<EOF_USAGE
+Usage: $PROGRAM [OPTIONS]
+
+Set the modification time of each tracked working-tree file to the time of the
+most recent Git commit that actually changed its contents.
+
+Options:
+  -j, --jobs N            process up to N files in parallel
+      --date=TYPE         timestamp to use: committer (default) or author
+  -n, --dry-run           show target timestamps without touching files
+  -v, --verbose           print each file as it is processed
+  -f, --force             allow tracked working-tree changes
+  -h, --help              show this help and exit
+      --version           show version and exit
+
+Pure renames (100% identical contents) and mode-only changes are ignored.
+Merges inherit the date from a parent with identical contents; if several match,
+the first matching parent is used. Otherwise the merge itself supplies the date.
+--date chooses the date field, not the order in which history is searched.
+
+Requires Bash 4+, Git with ls-tree --format, and GNU coreutils/findutils.
+Do not modify the working tree while this command is running.
+EOF_USAGE
+}
+
+warn() {
+    printf '%s: warning: %s\n' "$PROGRAM" "$*" >&2
+}
+
+die() {
+    printf '%s: error: %s\n' "$PROGRAM" "$*" >&2
+    exit 1
+}
+
+# Skip commits with no change to this path. --show-pulls also exposes merges
+# that retained a later parent's entry, so we can select parents by blob ID
+# (ignoring modes) and follow exact renames. Merges identical to their first
+# parent are safely simplified away. Ties use the first matching parent.
+find_content_timestamp() {
+    local file=$1 revision=$GFD_HEAD commit timestamp parent entry blob
+    local metadata old_path new_path inherited diff_ok rename_path
+    local -a fields parents
+
+    while :; do
+        commit=$(git --literal-pathspecs log -1 --show-pulls --no-patch \
+            --no-notes --no-show-signature --no-color --format=%H \
+            "$revision" -- "$file") || return
+        [[ -n $commit ]] || return 1
+        # Path-limited log can rewrite parents. Read the selected commit again
+        # without a path filter to get its actual parents (or shallow boundary).
+        entry=$(git show -s --no-notes --no-show-signature --no-color \
+            --format='%H %ct %at %P' "$commit") || return
+        read -r -a fields <<< "$entry"
+        if [[ $GFD_DATE_KIND == author ]]; then
+            timestamp=${fields[2]}
+        else
+            timestamp=${fields[1]}
+        fi
+        parents=("${fields[@]:3}")
+        blob=$(git --literal-pathspecs ls-tree --format='%(objectname)' \
+            "$commit" -- "$file") || return
+        [[ -n $blob ]] || return 1
+
+        inherited=0
+        for parent in "${parents[@]}"; do
+            entry=$(git --literal-pathspecs ls-tree --format='%(objectname)' \
+                "$parent" -- "$file") || return
+            if [[ $entry == "$blob" ]]; then
+                revision=$parent
+                inherited=1
+                break
+            fi
+
+            # An existing, different entry means an actual content change.
+            # Only a newly appearing path needs a full-tree rename search.
+            [[ -z $entry ]] || continue
+            diff_ok=0
+            rename_path=''
+            # An empty record marks successful completion. Process substitution
+            # does not propagate Git's exit status, so EOF alone is not enough.
+            # Drain the stream even after a match to detect late Git failures.
+            while IFS= read -r -d '' metadata; do
+                if [[ -z $metadata ]]; then
+                    diff_ok=1
+                    break
+                fi
+                IFS= read -r -d '' old_path || return 1
+                if [[ $metadata == *' R100' ]]; then
+                    IFS= read -r -d '' new_path || return 1
+                    [[ $new_path != "$file" ]] || rename_path=$old_path
+                fi
+            done < <(
+                git -c diff.renameLimit=0 diff-tree --no-commit-id --raw -r -z \
+                    --no-abbrev --no-ext-diff --no-textconv --find-renames=100% \
+                    "$parent" "$commit" && printf '\0'
+            )
+            (( diff_ok )) || return 1
+            if [[ -n $rename_path ]]; then
+                file=$rename_path
+                revision=$parent
+                inherited=1
+            fi
+            (( inherited )) && break
+        done
+
+        if (( ! inherited )); then
+            [[ $timestamp =~ ^-?[0-9]+$ ]] || return 1
+            printf '%s\n' "$timestamp"
+            return 0
+        fi
+    done
+}
+
+format_timestamp() {
+    LC_ALL=C date --date="@$1" '+%Y-%m-%d %H:%M:%S %z'
+}
+
+set_file_date() {
+    local file=$1
+    local timestamp formatted
+
+    # HEAD can contain files intentionally absent from this working tree
+    # (sparse checkout), and --force can leave deleted tracked files absent.
+    # Never recreate them. Git submodules are directories and are skipped too.
+    if [[ ! -f $file && ! -L $file ]]; then
+        if (( GFD_VERBOSE )); then
+            printf 'skip  %q (not a file in the working tree)\n' "$file"
+        fi
+        return 0
+    fi
+
+    if ! timestamp=$(find_content_timestamp "$file"); then
+        printf '%s: error: could not determine content-change date for %q\n' \
+            "$PROGRAM" "$file" >&2
+        return 1
+    fi
+
+    if (( GFD_DRY_RUN || GFD_VERBOSE )); then
+        formatted=$(format_timestamp "$timestamp")
+    fi
+
+    if (( GFD_DRY_RUN )); then
+        printf '%s  %q\n' "$formatted" "$file"
+        return 0
+    fi
+
+    # -c: never create a missing file
+    # -h: change a symlink itself, not its target
+    # -m: change only mtime, leaving atime alone
+    touch --no-create --no-dereference -m --date="@$timestamp" -- "$file"
+
+    if (( GFD_VERBOSE )); then
+        printf 'set   %s  %q\n' "$formatted" "$file"
+    fi
+}
+
+jobs=''
+date_kind='committer'
+dry_run=0
+verbose=0
+force=0
+
+while (($#)); do
+    case $1 in
+        -j|--jobs)
+            (($# >= 2)) || die "$1 requires an argument"
+            jobs=$2
+            shift 2
+            ;;
+        -j?*)
+            jobs=${1#-j}
+            shift
+            ;;
+        --jobs=*)
+            jobs=${1#*=}
+            shift
+            ;;
+        --date)
+            (($# >= 2)) || die "$1 requires an argument"
+            date_kind=$2
+            shift 2
+            ;;
+        --date=*)
+            date_kind=${1#*=}
+            shift
+            ;;
+        -n|--dry-run)
+            dry_run=1
+            shift
+            ;;
+        -v|--verbose)
+            verbose=1
+            shift
+            ;;
+        -f|--force)
+            force=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --version)
+            printf '%s %s\n' "$PROGRAM" "$VERSION"
+            exit 0
+            ;;
+        --)
+            shift
+            (($# == 0)) || die 'this command does not accept path arguments'
+            break
+            ;;
+        -*)
+            die "unknown option: $1"
+            ;;
+        *)
+            die "unexpected argument: $1"
+            ;;
+    esac
+done
+
+case $date_kind in
+    committer|author) ;;
+    *) die "invalid date type '$date_kind' (expected 'committer' or 'author')" ;;
+esac
+
+if [[ -z $jobs ]]; then
+    # Walking Git history is I/O-heavy; avoid spawning one process per CPU on
+    # very large machines unless the user explicitly asks for that.
+    if command -v nproc >/dev/null 2>&1; then
+        jobs=$(nproc)
+        (( jobs > DEFAULT_MAX_JOBS )) && jobs=$DEFAULT_MAX_JOBS
+    else
+        jobs=1
+    fi
+fi
+
+[[ $jobs =~ ^[1-9][0-9]*$ ]] || die "invalid job count '$jobs'"
+
+for required_command in git bash xargs date touch; do
+    command -v "$required_command" >/dev/null 2>&1 \
+        || die "required command not found: $required_command"
+done
+
+inside_work_tree=$(git rev-parse --is-inside-work-tree 2>/dev/null || true)
+[[ $inside_work_tree == true ]] || die 'not inside a Git working tree'
+
+# Preserve even a repository directory ending in a newline.
+repo_root=$(git rev-parse --show-toplevel && printf '.')
+repo_root=${repo_root%$'\n'.}
+cd "$repo_root"
+
+GFD_HEAD=$(git rev-parse --verify 'HEAD^{commit}') \
+    || die 'repository has no HEAD commit'
+
+if (( ! dry_run && ! force )); then
+    for diff_kind in working index; do
+        diff_args=(--no-ext-diff --no-textconv --quiet --ignore-submodules=all)
+        [[ $diff_kind == index ]] && diff_args+=(--cached "$GFD_HEAD")
+        if git diff "${diff_args[@]}" --; then
+            continue
+        else
+            status=$?
+            (( status == 1 )) || die 'could not check tracked-file changes'
+            die 'tracked files have uncommitted changes; commit/stash them or use --force'
+        fi
+    done
+fi
+
+if shallow=$(git rev-parse --is-shallow-repository 2>/dev/null) \
+        && [[ $shallow == true ]]; then
+    warn 'repository is shallow; dates may be limited by the available history'
+fi
+
+export GFD_HEAD
+export LC_ALL=C
+export GFD_DATE_KIND=$date_kind
+export GFD_DRY_RUN=$dry_run
+export GFD_VERBOSE=$verbose
+export PROGRAM
+export -f find_content_timestamp format_timestamp set_file_date
+
+printf "Processing '%s' (%s date, %d job%s) ...\n" \
+    "$repo_root" "$date_kind" "$jobs" "$([[ $jobs == 1 ]] && printf '' || printf 's')"
+
+# HEAD, rather than the index, defines the set of repository files. This keeps
+# staged additions/deletions from silently changing what the command processes.
+if ! git ls-tree -r -z "$GFD_HEAD" \
+    | while IFS= read -r -d '' entry; do
+        # Gitlinks are submodules, regardless of what exists at their path.
+        if [[ ${entry%%$'\t'*} == *' blob '* ]]; then
+            printf '%s\0' "${entry#*$'\t'}"
+        fi
+    done \
+    | xargs -0 -r -n 1 -P "$jobs" \
+        bash -c 'set -euo pipefail; set_file_date "$1"' _; then
+    die 'one or more files could not be processed'
+fi
+
+printf 'Done.\n'
