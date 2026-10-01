@@ -1,0 +1,633 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SOURCE_DIR=/opt/source
+UNIT_NAME=appsquash.service
+UNIT_PATH=/etc/systemd/system/$UNIT_NAME
+SELF_INSTALL_PATH=/usr/local/sbin/appsquash-helper
+
+die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
+info() { printf '%s\n' "$*" >&2; }
+
+usage() {
+    cat <<'EOF'
+Usage:
+  appsquash build APP SOURCE
+  appsquash mount APP
+  appsquash umount APP
+  appsquash mount-all
+  appsquash umount-all
+  appsquash reconcile
+  appsquash install
+  appsquash uninstall
+  appsquash status [APP]
+
+APP:
+  Installation/mount name. For example:
+    firefox
+    thunderbird
+    telegram
+
+SOURCE:
+  Either:
+    - a directory whose contents become the SquashFS root; or
+    - a tar archive containing exactly one top-level directory.
+      GNU tar handles supported compression formats automatically
+      (.tar.xz, .tar.gz, .tar.zst, etc.).
+
+Examples:
+  appsquash build firefox firefox-157.0.tar.xz
+  appsquash build thunderbird thunderbird-157.0.tar.xz
+  appsquash build telegram td-setup-linux-x64-7.2.10-beta.tar.xz
+  appsquash build foo /tmp/Foo
+
+Images and mounts:
+  /opt/source/APP.squashfs  ->  /opt/APP
+
+mount-all:
+  Discovers every /opt/source/*.squashfs image and mounts it. If /opt/APP
+  already exists and is non-empty, that image is skipped with a warning.
+
+umount-all:
+  Unmounts all currently mounted applications that correspond to images
+  present in /opt/source.
+
+reconcile:
+  Mounts discovered images that are not mounted yet, using the same
+  non-empty-target skip behavior as mount-all.
+
+build:
+  If /opt/APP is currently mounted, automatically finds every process using
+  that mounted filesystem (executables, mmap'ed files/shared libraries, open
+  files, cwd/root directories), then:
+    SIGTERM -> wait 5 s -> SIGTERM -> wait 5 s -> offer SIGKILL.
+  It then unmounts APP, builds a replacement image using:
+    SquashFS + Zstd level 22 + 1 MiB blocks + all ownership normalized
+    to root:root, validates it, atomically replaces the image, and mounts it.
+
+  Process discovery uses fuser -mM. The -M check deliberately refuses to
+  scan unless /opt/APP is a real mountpoint, avoiding accidental matches
+  against the filesystem backing /opt itself.
+
+install:
+  Installs this script as /usr/local/sbin/appsquash and installs one
+  appsquash.service. At boot it discovers and mounts all *.squashfs images
+  under /opt/source.
+
+NOTE:
+  This safety/testing version DOES NOT actually remove temporary files,
+  directories, or the unit during uninstall. Every rm is printed with
+  "Please run ..." instead.
+EOF
+}
+
+need_root() {
+    (( EUID == 0 )) || die "this operation must be run as root"
+}
+
+valid_app() {
+    [[ ${1:-} =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+}
+
+require_cmds() {
+    local cmd
+    for cmd in "$@"; do
+        command -v "$cmd" >/dev/null 2>&1 ||
+            die "required command not found: $cmd"
+    done
+}
+
+image_for() { printf '%s/%s.squashfs\n' "$SOURCE_DIR" "$1"; }
+mount_for() { printf '/opt/%s\n' "$1"; }
+mounted() {
+    mountpoint -q "$(mount_for "$1")"
+}
+
+mount_user_pids() {
+    local app=$1 target output pid
+    target=$(mount_for "$app")
+
+    mountpoint -q "$target" || return 0
+
+    # -m: all processes using this mounted filesystem.
+    # -M: safety belt; refuse unless TARGET is actually a mountpoint.
+    output=$(fuser -mM "$target" 2>/dev/null || true)
+
+    for pid in $output; do
+        [[ "$pid" =~ ^[0-9]+$ ]] && printf '%s\n' "$pid"
+    done | sort -nu
+}
+
+mount_in_use() {
+    [[ -n "$(mount_user_pids "$1")" ]]
+}
+
+show_mount_users() {
+    local app=$1 pid
+    local -a pids=()
+
+    while IFS= read -r pid; do
+        [[ -n "$pid" ]] && pids+=("$pid")
+    done < <(mount_user_pids "$app")
+
+    ((${#pids[@]})) || return 0
+
+    info "Processes using $(mount_for "$app"):"
+    for pid in "${pids[@]}"; do
+        ps -p "$pid" -o pid=,user=,stat=,comm=,args= 2>/dev/null || true
+    done >&2
+}
+
+signal_mount_users() {
+    local signal=$1 app=$2 pid
+    local -a pids=()
+
+    while IFS= read -r pid; do
+        [[ -n "$pid" ]] && pids+=("$pid")
+    done < <(mount_user_pids "$app")
+
+    ((${#pids[@]})) || return 0
+    kill "-$signal" "${pids[@]}" 2>/dev/null || true
+}
+
+stop_mount_users() {
+    local app=$1 answer
+
+    mountpoint -q "$(mount_for "$app")" || return 0
+    mount_in_use "$app" || return 0
+
+    show_mount_users "$app"
+    info "Sending SIGTERM to all processes using $(mount_for "$app")."
+    signal_mount_users TERM "$app"
+    sleep 5
+
+    mount_in_use "$app" || return 0
+
+    show_mount_users "$app"
+    info "Processes still use the mount; sending SIGTERM again."
+    signal_mount_users TERM "$app"
+    sleep 5
+
+    mount_in_use "$app" || return 0
+
+    info "Processes still using the mount after two SIGTERM attempts:"
+    show_mount_users "$app"
+
+    [[ -t 0 ]] ||
+        die "refusing to SIGKILL without an interactive terminal"
+
+    printf 'Send SIGKILL to all processes currently using %s? [y/N] ' \
+        "$(mount_for "$app")" >&2
+    read -r answer
+    case "$answer" in
+        y|Y|yes|Yes|YES)
+            signal_mount_users KILL "$app"
+            sleep 1
+            ;;
+        *)
+            die "aborted; $(mount_for "$app") is still in use"
+            ;;
+    esac
+
+    if mount_in_use "$app"; then
+        info "Processes still using the mount:"
+        show_mount_users "$app"
+        die "cannot continue"
+    fi
+}
+
+archive_topdir() {
+    local archive=$1
+    local entry clean component top=
+    local found=0
+
+    while IFS= read -r entry; do
+        clean=$entry
+
+        while [[ $clean == ./* ]]; do
+            clean=${clean#./}
+        done
+
+        [[ -n $clean && $clean != "." ]] || continue
+
+        case "$clean" in
+            /*|..|../*|*/../*|*/..)
+                die "unsafe archive pathname: $entry"
+                ;;
+        esac
+
+        component=${clean%%/*}
+        [[ -n $component && $component != "." && $component != ".." ]] ||
+            die "unsafe archive pathname: $entry"
+
+        if (( ! found )); then
+            top=$component
+            found=1
+        elif [[ $component != "$top" ]]; then
+            die "archive has more than one top-level entry ('$top' and '$component')"
+        fi
+    done < <(tar -tf "$archive")
+
+    (( found )) || die "archive is empty: $archive"
+    printf '%s\n' "$top"
+}
+
+prepare_source() {
+    local source=$1
+    local tmpdir_var=$2
+    local root_var=$3
+    local source_abs top tmpdir
+
+    source_abs=$(readlink -f -- "$source") ||
+        die "cannot resolve source: $source"
+
+    if [[ -d $source_abs ]]; then
+        [[ -n "$(find "$source_abs" -mindepth 1 -print -quit)" ]] ||
+            die "source directory is empty: $source_abs"
+
+        printf -v "$tmpdir_var" '%s' ''
+        printf -v "$root_var" '%s' "$source_abs"
+        return 0
+    fi
+
+    [[ -f $source_abs ]] || die "source is neither a directory nor a regular file: $source"
+
+    # Listing also verifies that GNU tar understands this archive/compression.
+    top=$(archive_topdir "$source_abs") ||
+        die "cannot read tar archive: $source_abs"
+
+    tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/appsquash.extract.XXXXXX")
+    # Fix permissions for the directory because otherwise ordinary users won't be able to run applications from the root:root 700 directory created by mktemp
+    chmod 0755 "$tmpdir"
+    info "Extracting '$top/' from $source_abs ..."
+
+    tar -xf "$source_abs" \
+        -C "$tmpdir" \
+        --strip-components=1 \
+        --no-same-owner
+
+    [[ -n "$(find "$tmpdir" -mindepth 1 -print -quit)" ]] ||
+        die "archive produced an empty application tree"
+
+    printf -v "$tmpdir_var" '%s' "$tmpdir"
+    printf -v "$root_var" '%s' "$tmpdir"
+}
+
+do_mount() {
+    local app=$1 image target fstype src
+
+    valid_app "$app" || die "invalid application name: $app"
+
+    image=$(image_for "$app")
+    target=$(mount_for "$app")
+
+    [[ -f "$image" ]] || die "image does not exist: $image"
+
+    if mountpoint -q "$target"; then
+        src=$(findmnt -n -o SOURCE --target "$target")
+        fstype=$(findmnt -n -o FSTYPE --target "$target")
+        [[ "$fstype" == squashfs ]] ||
+            die "$target is already mounted with filesystem type '$fstype'"
+        info "$target is already mounted ($src)"
+        return 0
+    fi
+
+    if [[ -e "$target" && ! -d "$target" ]]; then
+        die "mount point exists but is not a directory: $target"
+    fi
+
+    if [[ -d "$target" ]] &&
+       find "$target" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+        die "$target is not empty; move/remove the old installation before mounting"
+    fi
+
+    mkdir -p "$target"
+    mount -t squashfs -o loop,ro "$image" "$target"
+
+    fstype=$(findmnt -n -o FSTYPE --target "$target")
+    [[ "$fstype" == squashfs ]] ||
+        die "mount verification failed for $target"
+
+    info "Mounted $image on $target"
+}
+
+do_umount() {
+    local app=$1 target
+
+    valid_app "$app" || die "invalid application name: $app"
+    target=$(mount_for "$app")
+
+    mountpoint -q "$target" || return 0
+    umount "$target"
+    info "Unmounted $target"
+}
+
+stop_mount_instance() {
+    do_umount "$1"
+}
+
+start_mount_instance() {
+    do_mount "$1"
+}
+
+build_image() {
+    local app source image
+    local extract_tmp= source_root=
+    local image_tmpdir newimage
+    local restart_needed=0
+    local -a processes=()
+
+    need_root
+    require_cmds tar mksquashfs unsquashfs pgrep pkill systemctl \
+                 mount umount mountpoint findmnt find awk grep readlink mktemp
+
+    while [[ ${1:-} == --process ]]; do
+        [[ $# -ge 2 && -n ${2:-} ]] ||
+            die "--process requires an exact process name"
+        processes+=("$2")
+        shift 2
+    done
+
+    [[ $# -eq 2 ]] || { usage >&2; exit 2; }
+
+    app=$1
+    source=$2
+
+    valid_app "$app" ||
+        die "invalid application name '$app' (use letters, digits, '.', '_' or '-')"
+
+    image=$(image_for "$app")
+    prepare_source "$source" extract_tmp source_root
+
+    # Do not allow a directory source to be the mount point we are about to
+    # unmount; after the unmount the source tree would silently change.
+    if [[ -z "$extract_tmp" ]]; then
+        local source_real target_real
+        source_real=$(readlink -f -- "$source_root")
+        target_real=$(readlink -f -- "$(mount_for "$app")" 2>/dev/null || true)
+        if [[ -n "$target_real" && "$source_real" == "$target_real" ]]; then
+            die "source directory is the application's mount point: $source_real"
+        fi
+    fi
+
+    cleanup() {
+        local rc=$?
+
+        if [[ -n ${extract_tmp:-} ]]; then
+            info "Please run ..."
+            echo rm -rf -- "$extract_tmp"
+        fi
+
+        if [[ -n ${image_tmpdir:-} ]]; then
+            info "Please run ..."
+            echo rm -rf -- "$image_tmpdir"
+        fi
+
+        if (( rc != 0 && restart_needed )) && [[ -f "$image" ]]; then
+            info "Build failed; attempting to restore the existing mount."
+            start_mount_instance "$app" || true
+        fi
+
+        return "$rc"
+    }
+    trap cleanup EXIT INT TERM HUP
+
+    stop_mount_users "$app"
+    stop_mount_instance "$app"
+    restart_needed=1
+
+    mkdir -p "$SOURCE_DIR"
+    image_tmpdir=$(mktemp -d --tmpdir="$SOURCE_DIR" ".${app}.image.XXXXXX")
+    newimage="$image_tmpdir/${app}.squashfs"
+
+    info "Building $image from $source_root ..."
+    mksquashfs "$source_root" "$newimage" \
+        -comp zstd \
+        -Xcompression-level 22 \
+        -b 1M \
+        -all-root \
+        -noappend
+
+    info "Validating new SquashFS image ..."
+    unsquashfs -s "$newimage" >/dev/null
+    unsquashfs -ll "$newimage" >/dev/null
+
+    chown root:root "$newimage"
+    chmod 0644 "$newimage"
+
+    # image_tmpdir is deliberately on /opt/source so this rename stays on the
+    # same filesystem and replaces the live image atomically.
+    mv -fT -- "$newimage" "$image"
+    newimage=
+
+    info "Installed $image"
+
+    start_mount_instance "$app"
+    restart_needed=0
+
+    trap - EXIT INT TERM HUP
+
+    if [[ -n "$extract_tmp" ]]; then
+        info "Please run ..."
+        echo rm -rf -- "$extract_tmp"
+    fi
+
+    info "Please run ..."
+    echo rm -rf -- "$image_tmpdir"
+}
+
+discover_apps() {
+    local path base app
+    shopt -s nullglob
+    for path in "$SOURCE_DIR"/*.squashfs; do
+        base=${path##*/}
+        app=${base%.squashfs}
+        valid_app "$app" && printf '%s\n' "$app"
+    done
+    shopt -u nullglob
+}
+
+mount_all() {
+    local app target
+
+    while IFS= read -r app; do
+        [[ -n "$app" ]] || continue
+        target=$(mount_for "$app")
+
+        if mountpoint -q "$target"; then
+            continue
+        fi
+
+        if [[ -d "$target" ]] &&
+           find "$target" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+            info "warning: skipping $app: $target is non-empty"
+            continue
+        fi
+
+        if [[ -e "$target" && ! -d "$target" ]]; then
+            info "warning: skipping $app: $target exists and is not a directory"
+            continue
+        fi
+
+        if ! do_mount "$app"; then
+            info "warning: failed to mount $app"
+        fi
+    done < <(discover_apps)
+}
+
+umount_all() {
+    local -a apps=()
+    local app i
+
+    while IFS= read -r app; do
+        [[ -n "$app" ]] && apps+=("$app")
+    done < <(discover_apps)
+
+    for ((i=${#apps[@]}-1; i>=0; i--)); do
+        app=${apps[i]}
+        if mountpoint -q "$(mount_for "$app")"; then
+            do_umount "$app"
+        fi
+    done
+}
+
+reconcile() {
+    mount_all
+}
+
+install_self_and_unit() {
+    local self
+    need_root
+    require_cmds install systemctl
+
+    self=$(readlink -f "$0")
+    install -D -m 0755 "$self" "$SELF_INSTALL_PATH"
+
+    cat >"$UNIT_PATH" <<EOF
+[Unit]
+Description=Mount SquashFS applications
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=$SELF_INSTALL_PATH mount-all
+ExecStop=$SELF_INSTALL_PATH umount-all
+ExecReload=$SELF_INSTALL_PATH reconcile
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable "$UNIT_NAME"
+    systemctl restart "$UNIT_NAME"
+
+    info "Installed $SELF_INSTALL_PATH and $UNIT_PATH"
+}
+
+uninstall_unit() {
+    need_root
+
+    systemctl disable --now "$UNIT_NAME" 2>/dev/null || true
+
+    info "Please run ..."
+    echo rm -f -- "$UNIT_PATH"
+    systemctl daemon-reload
+
+    info "The helper and SquashFS images were left in place."
+}
+
+status_one() {
+    local app=$1 image target
+
+    valid_app "$app" || die "invalid application name: $app"
+
+    image=$(image_for "$app")
+    target=$(mount_for "$app")
+
+    printf '%-20s image=%-3s mounted=%-3s\n' \
+        "$app" \
+        "$([[ -f "$image" ]] && echo yes || echo no)" \
+        "$(mountpoint -q "$target" && echo yes || echo no)"
+}
+
+show_status() {
+    local requested=${1:-} app found=0
+
+    if [[ -n "$requested" ]]; then
+        status_one "$requested"
+        return
+    fi
+
+    while IFS= read -r app; do
+        [[ -n "$app" ]] || continue
+        status_one "$app"
+        found=1
+    done < <(discover_apps)
+
+    (( found )) || info "No SquashFS application images found in $SOURCE_DIR"
+}
+
+main() {
+    local cmd=${1:-}
+    shift || true
+
+    case "$cmd" in
+        build)
+            build_image "$@"
+            ;;
+        mount)
+            need_root
+            [[ $# -eq 1 ]] || { usage >&2; exit 2; }
+            require_cmds mount mountpoint findmnt find grep
+            do_mount "$1"
+            ;;
+        umount)
+            need_root
+            [[ $# -eq 1 ]] || { usage >&2; exit 2; }
+            require_cmds umount mountpoint
+            do_umount "$1"
+            ;;
+        mount-all)
+            need_root
+            [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+            require_cmds mount mountpoint findmnt find grep
+            mount_all
+            ;;
+        umount-all)
+            need_root
+            [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+            require_cmds umount mountpoint
+            umount_all
+            ;;
+        reconcile)
+            need_root
+            [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+            require_cmds mount mountpoint findmnt find grep
+            reconcile
+            ;;
+        install)
+            [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+            install_self_and_unit
+            ;;
+        uninstall)
+            [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+            uninstall_unit
+            ;;
+        status)
+            [[ $# -le 1 ]] || { usage >&2; exit 2; }
+            show_status "${1:-}"
+            ;;
+        -h|--help|help|'')
+            usage
+            ;;
+        *)
+            usage >&2
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"
