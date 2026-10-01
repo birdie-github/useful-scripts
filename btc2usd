@@ -5,8 +5,6 @@
 # 2026-08-25 17:54:43 coindesk must fuck itself
 # 2026-09-20 17:31:29 coindesk please fuck yourself
 
-set -x
-
 if ! jq --version &>/dev/null; then
     echo "Install jq"
     exit 1
